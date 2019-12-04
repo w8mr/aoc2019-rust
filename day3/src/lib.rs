@@ -7,6 +7,12 @@ struct Path {
     horizontal: bool
 }
 
+struct Context {
+    smallest: Option<i32>,
+    distance_path1: i32,
+    distance_path2: i32
+}
+
 fn distance(x:i32, y: i32) -> i32 {
     return x.abs() + y.abs();
 }
@@ -14,31 +20,32 @@ pub fn part1(wires: Vec<String>) -> i32 {
     let wire_paths:Vec<Vec<Path>> = wires.iter().map(|w| read_paths(w)).collect();
     let r = find_smallest_cross(wire_paths.get(0).unwrap(), wire_paths.get(1).unwrap(), distance);
 
-    return r.unwrap();
+    return r.smallest.unwrap();
 }
 
-fn find_smallest_cross(paths1: &Vec<Path>, paths2: &Vec<Path>, distance: fn(i32, i32) -> i32) -> Option<i32> {
-    paths1.iter().fold(None,
-        |acc, p| find_smallest_cross1(acc, p, paths2, distance)
+fn find_smallest_cross(paths1: &Vec<Path>, paths2: &Vec<Path>, distance: fn(i32, i32) -> i32) -> Context {
+    paths1.iter().fold(Context{smallest: None, distance_path1: 0, distance_path2: 0},
+        |context, p| find_smallest_cross1(context, p, paths2, distance)
     )
 }
 
-fn find_smallest_cross1(smallest: Option<i32>, path1: &Path, paths: &Vec<Path>, distance: fn(i32, i32) -> i32) -> Option<i32> {
-    return paths.iter().fold(smallest, |acc, path2| find_smallest_cross2(acc, path1, path2, distance))
+fn find_smallest_cross1(context: Context, path1: &Path, paths: &Vec<Path>, distance: fn(i32, i32) -> i32) -> Context {
+    return paths.iter().fold(context, |context, path2| find_smallest_cross2(context, path1, path2, distance))
 }
 
-fn find_smallest_cross2(smallest: Option<i32>, path1: &Path, path2: &Path, distance: fn(i32, i32) -> i32) -> Option<i32> {
-    return match find_cross(path1, path2) {
-        Some((0, 0)) => smallest,
+fn find_smallest_cross2(context: Context, path1: &Path, path2: &Path, distance: fn(i32, i32) -> i32) -> Context {
+    let new_smallest = match find_cross(path1, path2) {
+        Some((0, 0)) => context.smallest,
         Some((x, y)) => {
             let d = distance(x, y);
-            return match smallest {
+            match context.smallest {
                 Some(s) if s < d => Some(s),
                 _ => Some(d)
-            };
+            }
         },
-        _ => smallest
+        _ => context.smallest
     };
+    Context{smallest: new_smallest, distance_path1: context.distance_path1, distance_path2: context.distance_path2}
 }
 
 
@@ -99,6 +106,10 @@ fn read_paths(wire: &String) -> Vec<Path> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufReader;
+    use std::io::BufRead;
+    use std::fs::File;
+
     use super::*;
 
     #[test]
@@ -123,6 +134,15 @@ mod tests {
         wires.push("R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51".to_string());
         wires.push("U98,R91,D20,R16,D67,R40,U7,R15,U6,R7".to_string());
         assert_eq!(part1(wires), 135);
+    }
+
+    #[test]
+    fn part1_assignment() {
+        let f = File::open("input.txt").unwrap();
+        let file = BufReader::new(&f);
+        let wires: Vec<_> = file.lines().map(|l| l.unwrap()).collect();
+        assert_eq!(part1(wires), 721);
+
     }
 
 }
