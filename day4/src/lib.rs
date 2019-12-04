@@ -25,24 +25,14 @@ fn is_increasing(number: &i32) -> bool {
 }
 
 fn has_double(number: &i32) -> bool {
-    let mut remainder = *number;
-    let mut result = false;
-    let mut previous: Option<i32> = None;
-    for _i in 0..6 {
-        let digit = remainder % 10;
-        remainder = remainder / 10;
-        let new = match previous {
-            Some(prev) if prev == digit => true,
-            _ => false
-        };
-        result = result || new;
-//        println!("{} {} {:#?} {} {}", digit, remainder, previous, result, new);
-        previous = Some(digit);
-    }
-    return result;
+    count_doubles(number).iter().find(|n| **n >= 2).is_some()
 }
 
 fn has_double_which_is_not_triple(number: &i32) -> bool {
+    count_doubles(number).iter().find(|n| **n == 2).is_some()
+}
+
+fn count_doubles(number: &i32) -> Vec<i32> {
     let mut remainder = *number;
     let mut result = Vec::new();
     let mut previous: Option<i32> = None;
@@ -53,8 +43,7 @@ fn has_double_which_is_not_triple(number: &i32) -> bool {
         match previous {
             Some(prev) if prev == digit => {
                 double_count = double_count + 1;
-
-            },
+            }
             Some(_) => {
                 result.push(double_count);
                 double_count = 1
@@ -67,9 +56,8 @@ fn has_double_which_is_not_triple(number: &i32) -> bool {
     }
     result.push(double_count);
     println!("{:#?}", result);
-    return result.iter().find(|n| **n == 2).is_some();
+    result
 }
-
 
 
 pub fn part1(low: i32, high: i32) -> usize {
@@ -85,6 +73,7 @@ pub fn part2(low: i32, high: i32) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_matches_part1() {
         assert_eq!(matches_part1(&111111), true);
@@ -138,8 +127,23 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(1331, 1345), 8);
+        assert_eq!(part2(1331, 1345), 7);
         //1334, 1335, 1336, 1337, 1338, 1339, 1344
     }
 
+    #[test]
+    fn test_no_match_1333() {
+        assert_eq!(matches_part2(&1333), false);
+        //TODO: Fix length thing
+    }
+
+    #[test]
+    fn test_assignment_part1() {
+        assert_eq!(part1(246515, 739105), 1048);
+    }
+
+    #[test]
+    fn test_assignment_part2() {
+        assert_eq!(part2(246515, 739105), 677);
+    }
 }
