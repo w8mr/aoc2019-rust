@@ -1,73 +1,78 @@
-fn matches_part1(number: &i32) -> bool {
+use std::collections::HashMap;
+
+struct Digits {
+    n: usize,
+    divisor: usize,
+}
+
+impl Digits {
+    fn new(n: usize) -> Self {
+        let mut divisor = 10;
+        while n >= divisor {
+            divisor *= 10;
+        }
+
+        Digits { n: n, divisor: divisor }
+    }
+}
+
+impl Iterator for Digits {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.divisor == 0 {
+            None
+        } else {
+            let v = Some(self.n / self.divisor);
+            self.n %= self.divisor;
+            self.divisor /= 10;
+            v
+        }
+
+    }
+}
+
+fn matches_part1(number: usize) -> bool {
     is_increasing(number) && has_double(number)
 }
 
-fn matches_part2(number: &i32) -> bool {
+fn matches_part2(number: usize) -> bool {
     is_increasing(number) && has_double_which_is_not_triple(number)
 }
 
-fn is_increasing(number: &i32) -> bool {
-    let mut remainder = *number;
-    let mut result = true;
-    let mut previous: Option<i32> = None;
-    for _i in 0..6 {
-        let digit = remainder % 10;
-        remainder = remainder / 10;
-        let new = match previous {
-            Some(prev) if prev < digit => false,
-            _ => true
-        };
-        result = result && new;
-//        println!("{} {} {:#?} {} {}", digit, remainder, previous, result, new);
-        previous = Some(digit);
+
+fn is_increasing(number: usize) -> bool {
+    Digits::new(number)
+        .fold((true, None),
+              |(result, previous), digit: usize|
+                  (result && if let Some(previous) = previous { previous <= digit } else { true}, Some(digit))
+        ).0
+}
+
+fn has_double(number: usize) -> bool {
+    frequency(&mut Digits::new(number)).iter().filter(|(key, value)| **value >= 2).count() > 0
+}
+
+fn has_double_which_is_not_triple(number: usize) -> bool {
+    frequency(&mut Digits::new(number)).iter().filter(|(key, value)| **value == 2).count() > 0
+}
+
+fn frequency(iter: &mut dyn Iterator<Item=usize>) -> HashMap<usize, u32>{
+    let mut frequency: HashMap<usize, u32> = HashMap::new();
+    for item in iter.into_iter() {
+        *frequency.entry(item).or_insert(0) += 1;
     }
-    return result;
+    frequency
 }
 
-fn has_double(number: &i32) -> bool {
-    count_doubles(number).iter().find(|n| **n >= 2).is_some()
-}
-
-fn has_double_which_is_not_triple(number: &i32) -> bool {
-    count_doubles(number).iter().find(|n| **n == 2).is_some()
-}
-
-fn count_doubles(number: &i32) -> Vec<i32> {
-    let mut remainder = *number;
-    let mut result = Vec::new();
-    let mut previous: Option<i32> = None;
-    let mut double_count = 1;
-    for _i in 0..6 {
-        let digit = remainder % 10;
-        remainder = remainder / 10;
-        match previous {
-            Some(prev) if prev == digit => {
-                double_count = double_count + 1;
-            }
-            Some(_) => {
-                result.push(double_count);
-                double_count = 1
-            }
-            None => {
-                double_count = 1
-            }
-        };
-        previous = Some(digit);
-    }
-    result.push(double_count);
-    println!("{:#?}", result);
-    result
-}
-
-
-pub fn part1(low: i32, high: i32) -> usize {
+pub fn part1(low: usize, high: usize) -> usize {
 //    (low..high).filter(matches_part1).for_each(|n| println!("{}",n));
-    (low..high).filter(matches_part1).count()
+    (low..high).filter(|n| matches_part1(*n)).count()
 }
 
-pub fn part2(low: i32, high: i32) -> usize {
+pub fn part2(low: usize, high: usize) -> usize {
 //    (low..high).filter(matches_part2).for_each(|n| println!("{}",n));
-    (low..high).filter(matches_part2).count()
+    (low..high).filter(|n| matches_part2(*n)).count()
 }
 
 #[cfg(test)]
@@ -76,47 +81,47 @@ mod tests {
 
     #[test]
     fn test_matches_part1() {
-        assert_eq!(matches_part1(&111111), true);
+        assert_eq!(matches_part1(111111), true);
     }
 
     #[test]
     fn test_no_match_part1_not_increasing() {
-        assert_eq!(matches_part1(&223450), false);
+        assert_eq!(matches_part1(223450), false);
     }
 
     #[test]
     fn test_no_match_part1_no_double() {
-        assert_eq!(matches_part1(&123789), false);
+        assert_eq!(matches_part1(123789), false);
     }
 
     #[test]
     fn test_no_match_part1_start_decreasing() {
-        assert_eq!(matches_part1(&737999), false);
+        assert_eq!(matches_part1(737999), false);
     }
 
     #[test]
     fn test_match_part2() {
-        assert_eq!(matches_part2(&112233), true);
+        assert_eq!(matches_part2(112233), true);
     }
 
     #[test]
     fn test_no_match_part2_triple() {
-        assert_eq!(matches_part2(&123444), false);
+        assert_eq!(matches_part2(123444), false);
     }
 
     #[test]
     fn test_no_match_part2_triple_start() {
-        assert_eq!(matches_part2(&111234), false);
+        assert_eq!(matches_part2(111234), false);
     }
 
     #[test]
     fn test_match_part2_triple_double() {
-        assert_eq!(matches_part2(&111233), true);
+        assert_eq!(matches_part2(111233), true);
     }
 
     #[test]
     fn test_match_part2_quadruple_but_also_double() {
-        assert_eq!(matches_part2(&111122), true);
+        assert_eq!(matches_part2(111122), true);
     }
 
     #[test]
@@ -133,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_no_match_1333() {
-        assert_eq!(matches_part2(&1333), false);
+        assert_eq!(matches_part2(1333), false);
         //TODO: Fix length thing
     }
 
