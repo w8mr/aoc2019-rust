@@ -77,6 +77,45 @@ fn output_implementation(parameters: Vec<Parameter>, context: &mut Context) -> I
     IP::Relative(2)
 }
 
+fn jump_not_zero_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    if context.read(&parameters[0]) != 0 {
+        IP::Absolute(context.read(&parameters[1]) as usize)
+    } else {
+        IP::Relative(3)
+    }
+}
+
+fn jump_zero_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    let value = context.read(&parameters[0]);
+    let position = context.read(&parameters[1]);
+    if value == 0 {
+        IP::Absolute(position as usize)
+    } else {
+        IP::Relative(3)
+    }
+}
+
+fn less_than_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    let value = if context.read(&parameters[0]) < context.read(&parameters[1]) {
+        1
+    } else {
+        0
+    };
+    context.write(&parameters[2], value);
+    IP::Relative(4)
+}
+
+fn equals_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    let value = if context.read(&parameters[0]) == context.read(&parameters[1]) {
+        1
+    } else {
+        0
+    };
+    context.write(&parameters[2], value);
+    IP::Relative(4)
+}
+
+
 fn halt_implementation(_parameters: Vec<Parameter>, _context: &mut Context) -> IP  {
     IP::Halt
 }
@@ -130,6 +169,10 @@ fn init_instruction_definitions() -> HashMap<usize, Instruction> {
         Instruction { opcode: 2, operand_count: 3, implementation: multiply_implementation },
         Instruction { opcode: 3, operand_count: 1, implementation: input_implementation },
         Instruction { opcode: 4, operand_count: 1, implementation: output_implementation },
+        Instruction { opcode: 5, operand_count: 2, implementation: jump_not_zero_implementation },
+        Instruction { opcode: 6, operand_count: 2, implementation: jump_zero_implementation },
+        Instruction { opcode: 7, operand_count: 3, implementation: less_than_implementation },
+        Instruction { opcode: 8, operand_count: 3, implementation: equals_implementation },
         Instruction { opcode: 99, operand_count: 0, implementation: halt_implementation }
     );
     let mut result = HashMap::new();
@@ -213,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_day5_part1_opcode030499() {
-        let mut outputs = &mut Vec::new();
+        let outputs = &mut Vec::new();
         assert_eq!(day5(&vec!(3, 0, 4, 0, 99), &vec!(42), outputs), 42);
         assert_eq!(outputs.len(),1);
         assert_eq!(outputs[0],42);
@@ -242,10 +285,79 @@ mod tests {
     fn test_day5_part1_assignment() {
         let f = File::open("input5.txt").unwrap();
         let file = BufReader::new(&f);
-        let mut memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
+        let memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
 
-        let mut outputs = &mut Vec::new();
+        let outputs = &mut Vec::new();
         day5(&memory, &vec!(1), outputs);
         assert_eq!(*outputs.last().unwrap(), 16225258);
     }
+
+    #[test]
+    fn test_day5_part2_example1_not_equal() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,9,8,9,10,9,4,9,99,-1,8), &vec!(5), outputs), 3);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0], 0);
+    }
+
+    #[test]
+    fn test_day5_part2_example1_equal() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,9,8,9,10,9,4,9,99,-1,8), &vec!(8), outputs), 3);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0], 1);
+    }
+
+    #[test]
+    fn test_day5_part2_example4_less_than() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,3,1107,-1,8,3,4,3,99), &vec!(5), outputs), 3);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0], 1);
+    }
+
+    #[test]
+    fn test_day5_part2_example4_not_less_than() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,3,1107,-1,8,3,4,3,99), &vec!(8), outputs), 3);
+        assert_eq!(outputs, &vec!(0 as isize));
+    }
+
+    #[test]
+    fn test_day5_part2_jmp_example1_jmp() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9), &vec!(0), outputs), 3);
+        assert_eq!(outputs, &vec!(0 as isize));
+    }
+
+    #[test]
+    fn test_day5_part2_large_example4_less_than() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+                              1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+                              999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(7), outputs), 3);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0], 999);
+    }
+
+    #[test]
+    fn test_day5_part2_large_example4_equals() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+                              1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+                              999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(8), outputs), 3);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0], 1000);
+    }
+
+    #[test]
+    fn test_day5_part2_large_example4_not_less_than() {
+        let outputs = &mut Vec::new();
+        assert_eq!(day5(&vec!(3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+                              1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+                              999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(9), outputs), 3);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0], 1001);
+    }
+
 }

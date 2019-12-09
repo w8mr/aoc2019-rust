@@ -40,6 +40,10 @@ fn main() {
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 5 part 1: {}", outs.join(", "));
 
+    let outputs = &mut Vec::new();
+    day2::day5(&memory, &vec!(5), outputs);
+    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
+    println!("Day 5 part 2: {}", outs.join(", "));
 
 }
 
