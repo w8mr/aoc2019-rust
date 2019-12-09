@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 struct Instruction {
     opcode: Opcode,
     operand_count: usize,
-    implementation: fn(Vec<isize>, Vec<isize>, &mut Context) -> Option<isize>,
+    implementation: fn(Vec<isize>, Vec<isize>, &mut Context) -> IP,
 }
 
 #[derive(std::fmt::Debug, Copy, Clone)]
@@ -14,6 +14,12 @@ enum Opcode {
     Input = 3,
     Output = 4,
     Halt = 99,
+}
+
+enum IP {
+    Relative(isize),
+    Absolute(usize),
+    Halt,
 }
 
 impl std::fmt::Debug for Instruction {
@@ -34,30 +40,30 @@ fn read(parameters: &Vec<isize>, modes: &Vec<isize>, context: &Context, index: u
     }
 }
 
-fn add_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> Option<isize> {
+fn add_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP {
     context.memory[parameters[2] as usize] = read(&parameters, &modes, context, 0) + read(&parameters, &modes, context, 1);
-    Some(4)
+    IP::Relative(4)
 }
 
 
-fn multiply_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> Option<isize>  {
+fn multiply_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
     context.memory[parameters[2] as usize] = read(&parameters, &modes, context, 0) * read(&parameters, &modes, context, 1);
-    Some(4)
+    IP::Relative(4)
 }
 
-fn input_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> Option<isize>  {
+fn input_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
     context.memory[parameters[0] as usize] = context.inputs.pop().unwrap();
-    Some(2)
+    IP::Relative(2)
 }
 
-fn output_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> Option<isize>  {
+fn output_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
     context.outputs.push(read(&parameters, &modes, context, 0));
-    Some(2)
+    IP::Relative(2)
 }
 
 
-fn halt_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> Option<isize>  {
-    None
+fn halt_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
+    IP::Halt
 }
 
 #[derive(std::fmt::Debug)]
@@ -86,25 +92,21 @@ pub fn day2(opcodes: &Vec<isize>) -> isize {
 }
 
 pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>, outputs: &mut Vec<isize>) -> isize {
-    let instructions = vec!(
-        Instruction { opcode: Opcode::Add, operand_count: 3, implementation: add_implementation },
-        Instruction { opcode: Opcode::Multiply, operand_count: 3, implementation: multiply_implementation },
-        Instruction { opcode: Opcode::Input, operand_count: 1, implementation: input_implementation },
-        Instruction { opcode: Opcode::Output, operand_count: 1, implementation: output_implementation },
-        Instruction { opcode: Opcode::Halt, operand_count: 0, implementation: halt_implementation }
-    );
-    let instructions: HashMap<isize, &Instruction> = instructions.iter().map(|i| (i.opcode as isize, i)).collect();
+    let instructions = init_instruction_definitions();
     let context = &mut Context { memory: opcodes.to_vec(), inputs: inputs.to_vec(), outputs: outputs };
     let mut offset: usize = 0;
 
     loop {
-        let (modes, instruction, parameters) = parse_instruction(&instructions, &context, offset);
+        let (instruction, parameters, modes) = parse_instruction(&instructions, &context, offset);
 
         match (instruction.implementation)(parameters, modes, context) {
-            Some(offset_change) => {
+            IP::Relative(offset_change) => {
                 offset = (offset as isize + offset_change) as usize;
             }
-            None => {
+            IP::Absolute(position) => {
+                offset = position;
+            }
+            IP::Halt => {
                 break
             }
         }
@@ -114,12 +116,28 @@ pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>, outputs: &mut Vec<isize>)
     context.memory[0]
 }
 
-fn parse_instruction<'a>(instructions: &'a HashMap<isize, &Instruction>, context: &&'a mut Context, offset: usize) -> (Vec<isize>, &'a &'a Instruction, Vec<isize>) {
+fn init_instruction_definitions() -> HashMap<isize, Instruction> {
+    let instructions = vec!(
+        Instruction { opcode: Opcode::Add, operand_count: 3, implementation: add_implementation },
+        Instruction { opcode: Opcode::Multiply, operand_count: 3, implementation: multiply_implementation },
+        Instruction { opcode: Opcode::Input, operand_count: 1, implementation: input_implementation },
+        Instruction { opcode: Opcode::Output, operand_count: 1, implementation: output_implementation },
+        Instruction { opcode: Opcode::Halt, operand_count: 0, implementation: halt_implementation }
+    );
+    let mut result = HashMap::new();
+    for i in instructions {
+        result.insert(i.opcode as isize, i);
+    }
+//    instructions.iter().map(|i| (i.opcode as isize, *i)).collect()
+    result
+}
+
+fn parse_instruction<'a>(instructions: &'a HashMap<isize, Instruction>, context: &&'a mut Context, offset: usize) -> (&'a Instruction, Vec<isize>, Vec<isize>) {
     let opcode = &context.memory[offset];
     let (opcode, modes) = split_instruction(*opcode);
     let instruction = &instructions[&opcode];
     let parameters = ((offset + 1)..(offset + 1 + instruction.operand_count)).map(|i| context.memory[i]).collect();
-    (modes, instruction, parameters)
+    (instruction, parameters, modes)
 }
 
 #[cfg(test)]
@@ -183,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_opcode() {
+    fn test_day5_part1_split_opcode() {
         let (opcode, modes) = split_instruction(1002);
         assert_eq!(opcode, 2);
         assert_eq!(modes.len(), 2);
