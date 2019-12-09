@@ -1,10 +1,15 @@
 use std::collections::HashMap;
-use std::borrow::Borrow;
 
 struct Instruction {
     opcode: Opcode,
     operand_count: usize,
     implementation: fn(Vec<Parameter>, &mut Context) -> IP,
+}
+
+impl std::fmt::Debug for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "{{ opcode: {:#?}, operand_count: {} }}", self.opcode, self.operand_count)
+    }
 }
 
 #[derive(std::fmt::Debug, Copy, Clone)]
@@ -29,62 +34,63 @@ enum Parameter {
     Immediate(isize),
 }
 
-impl std::fmt::Debug for Instruction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(fmt, "{{ opcode: {:#?}, operand_count: {} }}", self.opcode, self.operand_count)
-    }
-}
-
-fn read(parameter: &Parameter, context: &Context) -> isize {
-    match parameter {
-        Parameter::Absolute(position) => context.memory[*position],
-        Parameter::Immediate(value) => *value
-    }
-}
-
-fn add_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP {
-    if let Parameter::Absolute(position) = parameters[2] {
-        context.memory[position] = read(&parameters[0], context) + read(&parameters[1], context);
-        IP::Relative(4)
-    } else {
-        panic!("Immediate mode not allowed for write");
-    }
-}
-
-
-fn multiply_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
-    if let Parameter::Absolute(position) = parameters[2] {
-        context.memory[position] = read(&parameters[0], context) * read(&parameters[1], context);
-        IP::Relative(4)
-    } else {
-        panic!("Immediate mode not allowed for write");
-    }
-}
-
-fn input_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
-    if let Parameter::Absolute(position) = parameters[0] {
-        context.memory[position] = context.inputs.pop().unwrap();
-        IP::Relative(2)
-    } else {
-        panic!("Immediate mode not allowed for write");
-    }
-}
-
-fn output_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
-    context.outputs.push(read(&parameters[0], context));
-    IP::Relative(2)
-}
-
-
-fn halt_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
-    IP::Halt
-}
-
 #[derive(std::fmt::Debug)]
 struct Context<'a> {
     memory: Vec<isize>,
     inputs: Vec<isize>,
     outputs: &'a mut Vec<isize>,
+}
+
+
+impl Context<'_> {
+    fn read(& self, parameter: &Parameter) -> isize {
+        match parameter {
+            Parameter::Absolute(position) => self.memory[*position],
+            Parameter::Immediate(value) => *value
+        }.clone()
+    }
+
+    fn write(&mut self, parameter: &Parameter, value: isize) {
+        match parameter {
+            Parameter::Absolute(position) => self.memory[*position] = value,
+            Parameter::Immediate(_) => panic!("Write in immediate mode is not possible!")
+        }
+    }
+
+    fn read_input(&mut self) -> isize {
+        self.inputs.pop().unwrap()
+    }
+
+    fn write_output(&mut self, value: isize) {
+        self.outputs.push(value);
+    }
+}
+
+fn add_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP {
+    context.write(&parameters[2], context.read(&parameters[0]) + context.read(&parameters[1]));
+    IP::Relative(4)
+}
+
+
+fn multiply_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    context.write(&parameters[2], context.read(&parameters[0]) * context.read(&parameters[1]));
+    IP::Relative(4)
+}
+
+fn input_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    let value = context.read_input();
+    context.write(&parameters[0], value);
+    IP::Relative(2)
+}
+
+fn output_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    context.write_output(context.read(&parameters[0]));
+    IP::Relative(2)
+}
+
+
+fn halt_implementation(_parameters: Vec<Parameter>, _context: &mut Context) -> IP  {
+    IP::Halt
 }
 
 fn split_instruction(opcode: isize) -> (isize, Vec<isize>) {
@@ -101,7 +107,7 @@ fn split_instruction(opcode: isize) -> (isize, Vec<isize>) {
 }
 
 pub fn day2(opcodes: &Vec<isize>) -> isize {
-    let mut outputs = &mut Vec::new();
+    let outputs = &mut Vec::new();
     day5(opcodes, &vec!(), outputs)
 }
 
