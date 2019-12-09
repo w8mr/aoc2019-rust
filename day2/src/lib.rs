@@ -26,13 +26,13 @@ enum Parameter {
 }
 
 #[derive(std::fmt::Debug)]
-struct Context<'a> {
+struct Context {
     memory: Vec<isize>,
     inputs: Vec<isize>,
-    outputs: &'a mut Vec<isize>,
+    outputs: Vec<isize>,
 }
 
-impl Context<'_> {
+impl Context {
     fn read(& self, parameter: &Parameter) -> isize {
         match parameter {
             Parameter::Absolute(position) => self.memory[*position],
@@ -134,13 +134,20 @@ fn split_instruction(opcode: usize) -> (usize, Vec<usize>) {
 }
 
 pub fn day2(opcodes: &Vec<isize>) -> isize {
-    let outputs = &mut Vec::new();
-    day5(opcodes, &vec!(), outputs)
+    let mut context = Context { memory: opcodes.to_vec(), inputs: vec!(), outputs: vec!() };
+    run(&mut context);
+    context.memory[0]
 }
 
-pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>, outputs: &mut Vec<isize>) -> isize {
+pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>) -> Vec<isize> {
+    let outputs = Vec::new();
+    let mut context = Context { memory: opcodes.to_vec(), inputs: inputs.to_vec(), outputs: outputs.to_vec() };
+    run(&mut context);
+    context.outputs
+}
+
+fn run(context: &mut Context) {
     let instructions = init_instruction_definitions();
-    let context = &mut Context { memory: opcodes.to_vec(), inputs: inputs.to_vec(), outputs: outputs };
     let mut offset: usize = 0;
 
     loop {
@@ -158,9 +165,7 @@ pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>, outputs: &mut Vec<isize>)
             }
         }
     }
-
   //  println!("{:#?}", context);
-    context.memory[0]
 }
 
 fn init_instruction_definitions() -> HashMap<usize, Instruction> {
@@ -201,6 +206,8 @@ fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context:
     //println!("{:#?} {:#?}", instruction, parameters);
     (instruction, parameters)
 }
+
+
 
 #[cfg(test)]
 mod tests {
@@ -256,8 +263,7 @@ mod tests {
 
     #[test]
     fn test_day5_part1_opcode030499() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3, 0, 4, 0, 99), &vec!(42), outputs), 42);
+        let outputs = day5(&vec!(3, 0, 4, 0, 99), &vec!(42));
         assert_eq!(outputs.len(),1);
         assert_eq!(outputs[0],42);
     }
@@ -287,77 +293,65 @@ mod tests {
         let file = BufReader::new(&f);
         let memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
 
-        let outputs = &mut Vec::new();
-        day5(&memory, &vec!(1), outputs);
+        let outputs = day5(&memory, &vec!(1));
         assert_eq!(*outputs.last().unwrap(), 16225258);
     }
 
     #[test]
     fn test_day5_part2_example1_not_equal() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,9,8,9,10,9,4,9,99,-1,8), &vec!(5), outputs), 3);
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0], 0);
+        let outputs = day5(&vec!(3,9,8,9,10,9,4,9,99,-1,8), &vec!(5));
+        assert_eq!(outputs, vec!(0));
     }
 
     #[test]
     fn test_day5_part2_example1_equal() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,9,8,9,10,9,4,9,99,-1,8), &vec!(8), outputs), 3);
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0], 1);
+        let outputs = day5(&vec!(3,9,8,9,10,9,4,9,99,-1,8), &vec!(8));
+        assert_eq!(outputs, vec!(1));
     }
 
     #[test]
     fn test_day5_part2_example4_less_than() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,3,1107,-1,8,3,4,3,99), &vec!(5), outputs), 3);
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0], 1);
+        let outputs = day5(&vec!(3,3,1107,-1,8,3,4,3,99), &vec!(5));
+        assert_eq!(outputs, vec!(1));
     }
 
     #[test]
     fn test_day5_part2_example4_not_less_than() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,3,1107,-1,8,3,4,3,99), &vec!(8), outputs), 3);
-        assert_eq!(outputs, &vec!(0 as isize));
+        let outputs = day5(&vec!(3,3,1107,-1,8,3,4,3,99), &vec!(8));
+        assert_eq!(outputs, vec!(0));
     }
 
     #[test]
     fn test_day5_part2_jmp_example1_jmp() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9), &vec!(0), outputs), 3);
-        assert_eq!(outputs, &vec!(0 as isize));
+        let outputs = day5(&vec!(3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9), &vec!(0));
+        assert_eq!(outputs, vec!(0));
     }
 
     #[test]
     fn test_day5_part2_large_example4_less_than() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
-                              1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
-                              999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(7), outputs), 3);
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0], 999);
+        let outputs = day5(&vec!(
+            3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+            1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+            999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(7));
+        assert_eq!(outputs, vec!(999));
     }
 
     #[test]
     fn test_day5_part2_large_example4_equals() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
-                              1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
-                              999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(8), outputs), 3);
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0], 1000);
+        let outputs = day5(&vec!(
+            3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+            1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+            999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(8));
+        assert_eq!(outputs, vec!(1000));
     }
 
     #[test]
     fn test_day5_part2_large_example4_not_less_than() {
-        let outputs = &mut Vec::new();
-        assert_eq!(day5(&vec!(3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
-                              1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
-                              999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(9), outputs), 3);
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0], 1001);
+        let outputs = day5(&vec!(
+            3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+            1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+            999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99), &vec!(9));
+        assert_eq!(outputs, vec!(1001));
     }
 
 }

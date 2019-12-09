@@ -45,5 +45,8 @@ fn main() {
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 5 part 2: {}", outs.join(", "));
 
+
+
+
 }
 
