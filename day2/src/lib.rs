@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::io::BufReader;
+use std::io::BufRead;
+use std::fs::File;
 
 struct Instruction {
     opcode: usize,
@@ -207,14 +210,14 @@ fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context:
     (instruction, parameters)
 }
 
-
+pub fn read_program_from_file(path: &str) -> Vec<isize> {
+    let f = File::open(path).unwrap();
+    let file = BufReader::new(&f);
+    file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect()
+}
 
 #[cfg(test)]
 mod tests {
-    use std::io::BufReader;
-    use std::io::BufRead;
-    use std::fs::File;
-
     use super::*;
 
     #[test]
@@ -239,10 +242,7 @@ mod tests {
 
     #[test]
     fn test_day2_part1_assignment() {
-        let f = File::open("input2.txt").unwrap();
-        let file = BufReader::new(&f);
-        let mut memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
-
+        let mut memory = read_program_from_file("input2.txt");
         memory[1]=12;
         memory[2]=02;
         day2(&memory);
@@ -251,10 +251,7 @@ mod tests {
 
     #[test]
     fn test_day2_part2_assignment() {
-        let f = File::open("input2.txt").unwrap();
-        let file = BufReader::new(&f);
-        let mut memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
-
+        let mut memory = read_program_from_file("input2.txt");
         memory[1]=66;
         memory[2]=35;
         day2(&memory);
@@ -289,12 +286,18 @@ mod tests {
 
     #[test]
     fn test_day5_part1_assignment() {
-        let f = File::open("input5.txt").unwrap();
-        let file = BufReader::new(&f);
-        let memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
+        let memory = read_program_from_file("input5.txt");
 
         let outputs = day5(&memory, &vec!(1));
         assert_eq!(*outputs.last().unwrap(), 16225258);
+    }
+
+    #[test]
+    fn test_day5_part2_assignment() {
+        let memory = read_program_from_file("input5.txt");
+
+        let outputs = day5(&memory, &vec!(5));
+        assert_eq!(*outputs.last().unwrap(), 2808771);
     }
 
     #[test]

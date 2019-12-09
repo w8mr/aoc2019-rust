@@ -1,11 +1,5 @@
-use std::io::BufReader;
-use std::io::BufRead;
-use std::fs::File;
-
 fn main() {
-    let f = File::open("input2.txt").unwrap();
-    let file = BufReader::new(&f);
-    let mut memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
+    let mut memory = day2::read_program_from_file("input2.txt");
     memory[1]=12;
     memory[2]=02;
     println!("Day 2 part 1: {}",day2::day2(&memory));
@@ -31,17 +25,13 @@ fn main() {
     memory[2]=35;
     println!("Day 2 part 2: {}",day2::day2(&memory));
 
-    let f = File::open("input5.txt").unwrap();
-    let file = BufReader::new(&f);
-    let memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
+    let memory = day2::read_program_from_file("input5.txt");
 
-    let outputs = &mut Vec::new();
-    day2::day5(&memory, &vec!(1), outputs);
+    let outputs = day2::day5(&memory, &vec!(1));
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 5 part 1: {}", outs.join(", "));
 
-    let outputs = &mut Vec::new();
-    day2::day5(&memory, &vec!(5), outputs);
+    let outputs = day2::day5(&memory, &vec!(5));
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 5 part 2: {}", outs.join(", "));
 
