@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 struct Instruction {
     opcode: Opcode,
     operand_count: usize,
-    implementation: fn(Vec<isize>, Vec<isize>, &mut Context) -> IP,
+    implementation: fn(Vec<Parameter>, &mut Context) -> IP,
 }
 
 #[derive(std::fmt::Debug, Copy, Clone)]
@@ -16,10 +16,17 @@ enum Opcode {
     Halt = 99,
 }
 
+#[derive(std::fmt::Debug)]
 enum IP {
     Relative(isize),
     Absolute(usize),
     Halt,
+}
+
+#[derive(std::fmt::Debug)]
+enum Parameter {
+    Absolute(usize),
+    Immediate(isize),
 }
 
 impl std::fmt::Debug for Instruction {
@@ -28,41 +35,48 @@ impl std::fmt::Debug for Instruction {
     }
 }
 
-fn read(parameters: &Vec<isize>, modes: &Vec<isize>, context: &Context, index: usize) -> isize {
-    let mode = match modes.get(index as usize) {
-        Some(mode) => *mode,
-        None => 0 as isize
-    };
-    if mode == 0 {
-        context.memory[parameters[index] as usize]
-    } else {
-        parameters[index]
+fn read(parameter: &Parameter, context: &Context) -> isize {
+    match parameter {
+        Parameter::Absolute(position) => context.memory[*position],
+        Parameter::Immediate(value) => *value
     }
 }
 
-fn add_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP {
-    context.memory[parameters[2] as usize] = read(&parameters, &modes, context, 0) + read(&parameters, &modes, context, 1);
-    IP::Relative(4)
+fn add_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP {
+    if let Parameter::Absolute(position) = parameters[2] {
+        context.memory[position] = read(&parameters[0], context) + read(&parameters[1], context);
+        IP::Relative(4)
+    } else {
+        panic!("Immediate mode not allowed for write");
+    }
 }
 
 
-fn multiply_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
-    context.memory[parameters[2] as usize] = read(&parameters, &modes, context, 0) * read(&parameters, &modes, context, 1);
-    IP::Relative(4)
+fn multiply_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    if let Parameter::Absolute(position) = parameters[2] {
+        context.memory[position] = read(&parameters[0], context) * read(&parameters[1], context);
+        IP::Relative(4)
+    } else {
+        panic!("Immediate mode not allowed for write");
+    }
 }
 
-fn input_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
-    context.memory[parameters[0] as usize] = context.inputs.pop().unwrap();
+fn input_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    if let Parameter::Absolute(position) = parameters[0] {
+        context.memory[position] = context.inputs.pop().unwrap();
+        IP::Relative(2)
+    } else {
+        panic!("Immediate mode not allowed for write");
+    }
+}
+
+fn output_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+    context.outputs.push(read(&parameters[0], context));
     IP::Relative(2)
 }
 
-fn output_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
-    context.outputs.push(read(&parameters, &modes, context, 0));
-    IP::Relative(2)
-}
 
-
-fn halt_implementation(parameters: Vec<isize>, modes: Vec<isize>, context: &mut Context) -> IP  {
+fn halt_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
     IP::Halt
 }
 
@@ -97,9 +111,9 @@ pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>, outputs: &mut Vec<isize>)
     let mut offset: usize = 0;
 
     loop {
-        let (instruction, parameters, modes) = parse_instruction(&instructions, &context, offset);
+        let (instruction, parameters) = parse_instruction(&instructions, &context, offset);
 
-        match (instruction.implementation)(parameters, modes, context) {
+        match (instruction.implementation)(parameters, context) {
             IP::Relative(offset_change) => {
                 offset = (offset as isize + offset_change) as usize;
             }
@@ -132,12 +146,22 @@ fn init_instruction_definitions() -> HashMap<isize, Instruction> {
     result
 }
 
-fn parse_instruction<'a>(instructions: &'a HashMap<isize, Instruction>, context: &&'a mut Context, offset: usize) -> (&'a Instruction, Vec<isize>, Vec<isize>) {
+fn parse_instruction<'a>(instructions: &'a HashMap<isize, Instruction>, context: &&'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
     let opcode = &context.memory[offset];
     let (opcode, modes) = split_instruction(*opcode);
     let instruction = &instructions[&opcode];
-    let parameters = ((offset + 1)..(offset + 1 + instruction.operand_count)).map(|i| context.memory[i]).collect();
-    (instruction, parameters, modes)
+    let param_values:Vec<isize> = ((offset + 1)..(offset + 1 + instruction.operand_count)).map(|i| context.memory[i]).collect();
+
+    let parameters = param_values
+        .iter()
+        .enumerate()
+        .map(|(i, param)|
+            match modes.get(i) {
+                Some(1) => Parameter::Immediate(*param),
+                _ => Parameter::Absolute(*param as usize) }
+        ).collect();
+    //println!("{:#?} {:#?}", instruction, parameters);
+    (instruction, parameters)
 }
 
 #[cfg(test)]
