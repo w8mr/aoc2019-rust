@@ -8,7 +8,7 @@ fn main() {
     let mut memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
     memory[1]=12;
     memory[2]=02;
-    println!("Day 2 part 1: {}",day2::part1(&memory));
+    println!("Day 2 part 1: {}",day2::day2(&memory));
 
 //1202 4138687
 //1302 4426687 288000
@@ -29,6 +29,17 @@ fn main() {
 
     memory[1]=66;
     memory[2]=35;
-    println!("Day 2 part 2: {}",day2::part1(&memory));
+    println!("Day 2 part 2: {}",day2::day2(&memory));
+
+    let f = File::open("input5.txt").unwrap();
+    let file = BufReader::new(&f);
+    let mut memory: Vec<_> = file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect();
+
+    let mut outputs = &mut Vec::new();
+    day2::day5(&memory, &vec!(1), outputs);
+    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
+    println!("Day 5 part 1: {}", outs.join(", "));
+
+
 }
 
