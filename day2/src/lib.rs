@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 struct Instruction {
-    opcode: Opcode,
+    opcode: usize,
     operand_count: usize,
     implementation: fn(Vec<Parameter>, &mut Context) -> IP,
 }
@@ -10,15 +10,6 @@ impl std::fmt::Debug for Instruction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "{{ opcode: {:#?}, operand_count: {} }}", self.opcode, self.operand_count)
     }
-}
-
-#[derive(std::fmt::Debug, Copy, Clone)]
-enum Opcode {
-    Add = 1,
-    Multiply = 2,
-    Input = 3,
-    Output = 4,
-    Halt = 99,
 }
 
 #[derive(std::fmt::Debug)]
@@ -40,7 +31,6 @@ struct Context<'a> {
     inputs: Vec<isize>,
     outputs: &'a mut Vec<isize>,
 }
-
 
 impl Context<'_> {
     fn read(& self, parameter: &Parameter) -> isize {
@@ -71,7 +61,6 @@ fn add_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP {
     IP::Relative(4)
 }
 
-
 fn multiply_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
     context.write(&parameters[2], context.read(&parameters[0]) * context.read(&parameters[1]));
     IP::Relative(4)
@@ -88,12 +77,11 @@ fn output_implementation(parameters: Vec<Parameter>, context: &mut Context) -> I
     IP::Relative(2)
 }
 
-
 fn halt_implementation(_parameters: Vec<Parameter>, _context: &mut Context) -> IP  {
     IP::Halt
 }
 
-fn split_instruction(opcode: isize) -> (isize, Vec<isize>) {
+fn split_instruction(opcode: usize) -> (usize, Vec<usize>) {
     let mut opcode = opcode;
     let basic_opcode = opcode % 100;
     opcode /= 100;
@@ -136,25 +124,26 @@ pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>, outputs: &mut Vec<isize>)
     context.memory[0]
 }
 
-fn init_instruction_definitions() -> HashMap<isize, Instruction> {
+fn init_instruction_definitions() -> HashMap<usize, Instruction> {
     let instructions = vec!(
-        Instruction { opcode: Opcode::Add, operand_count: 3, implementation: add_implementation },
-        Instruction { opcode: Opcode::Multiply, operand_count: 3, implementation: multiply_implementation },
-        Instruction { opcode: Opcode::Input, operand_count: 1, implementation: input_implementation },
-        Instruction { opcode: Opcode::Output, operand_count: 1, implementation: output_implementation },
-        Instruction { opcode: Opcode::Halt, operand_count: 0, implementation: halt_implementation }
+        Instruction { opcode: 1, operand_count: 3, implementation: add_implementation },
+        Instruction { opcode: 2, operand_count: 3, implementation: multiply_implementation },
+        Instruction { opcode: 3, operand_count: 1, implementation: input_implementation },
+        Instruction { opcode: 4, operand_count: 1, implementation: output_implementation },
+        Instruction { opcode: 99, operand_count: 0, implementation: halt_implementation }
     );
     let mut result = HashMap::new();
     for i in instructions {
-        result.insert(i.opcode as isize, i);
+        result.insert(i.opcode, i);
     }
-//    instructions.iter().map(|i| (i.opcode as isize, *i)).collect()
     result
+
+//    instructions.iter().map(|&i| (i.opcode, i)).collect()
 }
 
-fn parse_instruction<'a>(instructions: &'a HashMap<isize, Instruction>, context: &&'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
-    let opcode = &context.memory[offset];
-    let (opcode, modes) = split_instruction(*opcode);
+fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context: &&'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
+    let opcode = context.memory[offset] as usize;
+    let (opcode, modes) = split_instruction(opcode);
     let instruction = &instructions[&opcode];
     let param_values:Vec<isize> = ((offset + 1)..(offset + 1 + instruction.operand_count)).map(|i| context.memory[i]).collect();
 
