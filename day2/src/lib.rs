@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
+use std::thread;
 
 struct Instruction {
     opcode: usize,
@@ -31,8 +34,8 @@ enum Parameter {
 #[derive(std::fmt::Debug)]
 struct Context {
     memory: Vec<isize>,
-    inputs: Vec<isize>,
-    outputs: Vec<isize>,
+    input: Receiver<isize>,
+    output: Sender<isize>,
 }
 
 impl Context {
@@ -51,11 +54,11 @@ impl Context {
     }
 
     fn read_input(&mut self) -> isize {
-        self.inputs.pop().unwrap()
+        self.input.recv().unwrap()
     }
 
     fn write_output(&mut self, value: isize) {
-        self.outputs.push(value);
+        self.output.send(value);
     }
 }
 
@@ -138,18 +141,27 @@ fn split_instruction(opcode: usize) -> (usize, Vec<usize>) {
 }
 
 pub fn day2(opcodes: &Vec<isize>) -> isize {
-    let mut context = Context { memory: opcodes.to_vec(), inputs: vec!(), outputs: vec!() };
-    run(&mut context);
-    context.memory[0]
+    let (input_send, input) = mpsc::channel();
+    let (output, output_recieve) = mpsc::channel();
+    let mut context = Context { memory: opcodes.to_vec(), input, output };
+    thread::spawn(move || {
+        run(&mut context);
+        context.memory[0]
+    }).join().unwrap_or_default()
 }
 
 pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>) -> Vec<isize> {
-    let outputs = Vec::new();
-    let mut inputs = inputs.clone();
-    inputs.reverse();
-    let mut context = Context { memory: opcodes.to_vec(), inputs, outputs };
-    run(&mut context);
-    context.outputs
+    let (input_send, input) = mpsc::channel();
+    let (output, output_recieve) = mpsc::channel();
+
+    inputs.iter().for_each(|&i| {input_send.send(i);});
+
+    let mut context = Context { memory: opcodes.to_vec(), input, output };
+    thread::spawn(move || {
+        run(&mut context);
+    });
+
+    output_recieve.iter().collect()
 }
 
 pub fn recurse(input: Vec<usize>) -> Vec<Vec<usize>> {
