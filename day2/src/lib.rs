@@ -71,6 +71,7 @@ fn multiply_implementation(parameters: Vec<Parameter>, context: &mut Context) ->
 
 fn input_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
     let value = context.read_input();
+//    println!("input: {}", value);
     context.write(&parameters[0], value);
     IP::Relative(2)
 }
@@ -144,9 +145,50 @@ pub fn day2(opcodes: &Vec<isize>) -> isize {
 
 pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>) -> Vec<isize> {
     let outputs = Vec::new();
-    let mut context = Context { memory: opcodes.to_vec(), inputs: inputs.to_vec(), outputs: outputs.to_vec() };
+    let mut inputs = inputs.clone();
+    inputs.reverse();
+    let mut context = Context { memory: opcodes.to_vec(), inputs, outputs };
     run(&mut context);
     context.outputs
+}
+
+pub fn recurse(input: Vec<usize>) -> Vec<Vec<usize>> {
+    if input.len() == 1 {
+        vec!(input)
+    } else {
+        (0..input.len()).flat_map(|index| -> Vec<Vec<usize>> {
+            let mut rec_input = input.clone();
+            let item = rec_input.remove(index);
+            let recurse = recurse(rec_input);
+            recurse.iter().map(|vec| {
+                let mut v = vec.clone();
+                v.push(item);
+                v
+            }).collect()
+        }).collect()
+    }
+}
+
+pub fn day7(opcodes: &Vec<isize>) -> (Vec<usize>, isize) {
+    recurse((0..5).collect())
+        .iter()
+        .fold(None, |acc: Option<(Vec<usize>, isize)>, phases| {
+            let result = day7_internal(opcodes, &phases);
+            match acc {
+                Some((p, high)) if high >= result => Some((p, high)),
+                _ => Some((phases.clone(), result)),
+            }
+        }).unwrap()
+}
+
+fn day7_internal(opcodes: &Vec<isize>, phases:&Vec<usize>) -> isize {
+    let mut input = 0;
+    for phase in phases {
+        //println!("{}: {}",phase, input);
+        let output = day5(opcodes, &vec!(*phase as isize, input));
+        input = *output.last().unwrap();
+    }
+    input
 }
 
 fn run(context: &mut Context) {
@@ -154,7 +196,7 @@ fn run(context: &mut Context) {
     let mut offset: usize = 0;
 
     loop {
-        let (instruction, parameters) = parse_instruction(&instructions, &context, offset);
+        let (instruction, parameters) = parse_instruction(&instructions, context, offset);
 
         match (instruction.implementation)(parameters, context) {
             IP::Relative(offset_change) => {
@@ -192,7 +234,7 @@ fn init_instruction_definitions() -> HashMap<usize, Instruction> {
 //    instructions.iter().map(|&i| (i.opcode, i)).collect()
 }
 
-fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context: &&'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
+fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context: &'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
     let opcode = context.memory[offset] as usize;
     let (opcode, modes) = split_instruction(opcode);
     let instruction = &instructions[&opcode];
@@ -357,4 +399,56 @@ mod tests {
         assert_eq!(outputs, vec!(1001));
     }
 
+    #[test]
+    fn test_recursive1() {
+        let rec = recurse(vec!(1));
+        assert_eq!(rec.len(), 1);
+        assert!((rec.contains(&vec!(1))));
+    }
+
+    #[test]
+    fn test_recursive2() {
+        let rec = recurse(vec!(1,2));
+        assert_eq!(rec.len(), 2);
+        assert!((rec.contains(&vec!(1,2))));
+        assert!((rec.contains(&vec!(2,1))));
+    }
+
+    #[test]
+    fn test_recursive3() {
+        let rec = recurse(vec!(1,2,3));
+        assert_eq!(rec.len(), 6);
+        assert!((rec.contains(&vec!(1,2,3))));
+        assert!((rec.contains(&vec!(1,3,2))));
+        assert!((rec.contains(&vec!(2,1,3))));
+        assert!((rec.contains(&vec!(2,3,1))));
+        assert!((rec.contains(&vec!(3,1,2))));
+        assert!((rec.contains(&vec!(3,2,1))));
+    }
+
+    #[test]
+    fn test_day7_part1_example1_internal() {
+        assert_eq!(day7_internal(&vec!(3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0), &vec!(4,3,2,1,0)), 43210);
+    }
+
+    #[test]
+    fn test_day7_part1_example2_full() {
+        assert_eq!(day7(&vec!(
+            3,23,3,24,1002,24,10,24,1002,23,-1,23,
+            101,5,23,23,1,24,23,23,4,23,99,0,0)), (vec!(0,1,2,3,4), 54321));
+    }
+
+    #[test]
+    fn test_day7_part1_example3() {
+        assert_eq!(day7_internal(&vec!(
+            3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,
+            1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0), &vec!(1,0,4,3,2)), 65210);
+    }
+
+    #[test]
+    fn test_day7_part1_example3_full() {
+        assert_eq!(day7(&vec!(
+            3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,
+            1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0)), (vec!(1,0,4,3,2), 65210));
+    }
 }
