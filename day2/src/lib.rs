@@ -45,7 +45,7 @@ fn calc_position_and_resize(context: &mut Context, parameter: &Parameter) -> usi
     let position = match parameter {
         Parameter::Absolute(position) => *position,
         Parameter::Relative(position) => (context.relative_base as i64 + *position) as usize,
-        Parameter::Immediate(value) => 0,
+        Parameter::Immediate(_) => 0,
     };
     if position >= context.memory.len() {
         context.memory.resize(position + 1, 0);
@@ -78,7 +78,7 @@ impl Context {
 
     fn write_output(&mut self, value: i64) {
 //        println!("write {}", value);
-        self.output.send(value);
+        self.output.send(value).unwrap();
     }
 }
 
@@ -190,8 +190,8 @@ fn split_instruction(opcode: usize) -> (usize, Vec<usize>) {
 }
 
 pub fn day2(opcodes: &Vec<i64>) -> i64 {
-    let (input_send, input) = mpsc::channel();
-    let (output, output_recieve) = mpsc::channel();
+    let (_, input) = mpsc::channel();
+    let (output, _) = mpsc::channel();
     let mut context = Context { memory: opcodes.to_vec(), input, output, relative_base: 0 };
     thread::spawn(move || {
         run(&mut context);
@@ -203,10 +203,10 @@ pub fn day5(opcodes: &Vec<i64>, inputs: &Vec<i64>) -> Vec<i64> {
     let (input_send, input) = mpsc::channel();
     let (output, output_recieve) = mpsc::channel();
 
-    inputs.iter().for_each(|&i| {input_send.send(i);});
+    inputs.iter().for_each(|&i| {input_send.send(i).unwrap();});
 
     let mut context = Context { memory: opcodes.to_vec(), input, output, relative_base: 0 };
-    let handle = thread::spawn(move || {
+    thread::spawn(move || {
         run(&mut context);
     });
 
@@ -233,18 +233,18 @@ fn day7_internal(opcodes: &Vec<i64>, phases:&Vec<usize>) -> i64 {
     let (sender4, reciever5) = mpsc::channel();
     let (sender5, reciever0) = mpsc::channel();
 
-    let amplifier1 = init_amplifier(opcodes, sender1.clone(), reciever1, &phases[0]);
-    let amplifier2 = init_amplifier(opcodes, sender2.clone(), reciever2, &phases[0]);
-    let amplifier3 = init_amplifier(opcodes, sender3.clone(), reciever3, &phases[0]);
-    let amplifier4 = init_amplifier(opcodes, sender4.clone(), reciever4, &phases[0]);
-    let amplifier5 = init_amplifier(opcodes, sender5.clone(), reciever5, &phases[0]);
+    init_amplifier(opcodes, sender1.clone(), reciever1);
+    init_amplifier(opcodes, sender2.clone(), reciever2);
+    init_amplifier(opcodes, sender3.clone(), reciever3);
+    init_amplifier(opcodes, sender4.clone(), reciever4);
+    init_amplifier(opcodes, sender5.clone(), reciever5);
 
-    sender4.send(phases[4] as i64);
-    sender3.send(phases[3] as i64);
-    sender2.send(phases[2] as i64);
-    sender1.send(phases[1] as i64);
-    sender0.send(phases[0] as i64);
-    sender0.send(0);
+    sender4.send(phases[4] as i64).unwrap();
+    sender3.send(phases[3] as i64).unwrap();
+    sender2.send(phases[2] as i64).unwrap();
+    sender1.send(phases[1] as i64).unwrap();
+    sender0.send(phases[0] as i64).unwrap();
+    sender0.send(0).unwrap();
 
     std::mem::drop(sender1);
     std::mem::drop(sender2);
@@ -256,13 +256,13 @@ fn day7_internal(opcodes: &Vec<i64>, phases:&Vec<usize>) -> i64 {
     reciever0.iter().for_each(|n| {
 //        println!("iter {}", n);
         result = n;
-        sender0.send(n);
+        sender0.send(n).ok();
     });
 
     result
 }
 
-fn init_amplifier(opcodes: &Vec<i64>, sender: Sender<i64>, reciever :Receiver<i64>, phase: &usize) -> JoinHandle<()> {
+fn init_amplifier(opcodes: &Vec<i64>, sender: Sender<i64>, reciever :Receiver<i64>) -> JoinHandle<()> {
     let mut context = Context { memory: opcodes.to_vec(), input: reciever, output: sender, relative_base: 0 };
 //    println!("init amplifier");
     thread::spawn(move || {
@@ -577,9 +577,9 @@ mod tests {
     }
 
     #[test]
-    fn test_day9_part1_assignment() {
+    fn test_day9_part2_assignment() {
         let memory = read_program_from_file("input9.txt");
-        assert_eq!(day5(&memory, &vec!(2)), vec!(3235019597));
+        assert_eq!(day5(&memory, &vec!(2)), vec!(80274));
     }
 
 }
