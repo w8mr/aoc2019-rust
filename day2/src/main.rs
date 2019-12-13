@@ -20,7 +20,6 @@ fn main() {
 
 // 6635
 
-
     memory[1]=66;
     memory[2]=35;
     println!("Day 2 part 2: {}",day2::day2(&memory));
@@ -41,6 +40,15 @@ fn main() {
 
     let (phases, highest) = day2::day7(&memory, (5..10).collect());
     println!("Day 7 part 2: phases {:?}, high {}", phases, highest);
+
+    let memory = day2::read_program_from_file("input9.txt");
+    let outputs = day2::day5(&memory, &vec!(1));
+    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
+    println!("Day 9 part 1: {}", outs.join(", "));
+
+    let outputs = day2::day5(&memory, &vec!(2));
+    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
+    println!("Day 9 part 2: {}", outs.join(", "));
 
 }
 

@@ -21,7 +21,7 @@ impl std::fmt::Debug for Instruction {
 
 #[derive(std::fmt::Debug)]
 enum IP {
-    Relative(isize),
+    Relative(i64),
     Absolute(usize),
     Halt,
 }
@@ -29,50 +29,68 @@ enum IP {
 #[derive(std::fmt::Debug)]
 enum Parameter {
     Absolute(usize),
-    Immediate(isize),
+    Immediate(i64),
+    Relative(i64),
 }
 
 #[derive(std::fmt::Debug)]
 struct Context {
-    memory: Vec<isize>,
-    input: Receiver<isize>,
-    output: Sender<isize>,
+    memory: Vec<i64>,
+    input: Receiver<i64>,
+    output: Sender<i64>,
+    relative_base: usize,
+}
+
+fn calc_position_and_resize(context: &mut Context, parameter: &Parameter) -> usize {
+    let position = match parameter {
+        Parameter::Absolute(position) => *position,
+        Parameter::Relative(position) => (context.relative_base as i64 + *position) as usize,
+        Parameter::Immediate(value) => 0,
+    };
+    if position >= context.memory.len() {
+        context.memory.resize(position + 1, 0);
+    }
+    position
 }
 
 impl Context {
-    fn read(& self, parameter: &Parameter) -> isize {
+    fn read(&mut self, parameter: &Parameter) -> i64 {
+        let position= calc_position_and_resize(self, parameter);
         match parameter {
-            Parameter::Absolute(position) => self.memory[*position],
+            Parameter::Absolute(_) | Parameter::Relative(_) => self.memory[position],
             Parameter::Immediate(value) => *value
         }.clone()
     }
 
-    fn write(&mut self, parameter: &Parameter, value: isize) {
+    fn write(&mut self, parameter: &Parameter, value: i64) {
+        let position= calc_position_and_resize(self, parameter);
         match parameter {
-            Parameter::Absolute(position) => self.memory[*position] = value,
+            Parameter::Absolute(_) | Parameter::Relative(_) => self.memory[position] = value,
             Parameter::Immediate(_) => panic!("Write in immediate mode is not possible!")
         }
     }
 
-    fn read_input(&mut self) -> isize {
+    fn read_input(&mut self) -> i64 {
         let i = self.input.recv().unwrap();
 //        println!("read {}", i);
         i
     }
 
-    fn write_output(&mut self, value: isize) {
+    fn write_output(&mut self, value: i64) {
 //        println!("write {}", value);
         self.output.send(value);
     }
 }
 
 fn add_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP {
-    context.write(&parameters[2], context.read(&parameters[0]) + context.read(&parameters[1]));
+    let value = context.read(&parameters[0]) + context.read(&parameters[1]);
+    context.write(&parameters[2], value);
     IP::Relative(4)
 }
 
 fn multiply_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
-    context.write(&parameters[2], context.read(&parameters[0]) * context.read(&parameters[1]));
+    let value = context.read(&parameters[0]) * context.read(&parameters[1]);
+    context.write(&parameters[2], value);
     IP::Relative(4)
 }
 
@@ -84,7 +102,8 @@ fn input_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP
 }
 
 fn output_implementation(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
-    context.write_output(context.read(&parameters[0]));
+    let value = context.read(&parameters[0]);
+    context.write_output(value);
     IP::Relative(2)
 }
 
@@ -126,9 +145,35 @@ fn equals_implementation(parameters: Vec<Parameter>, context: &mut Context) -> I
     IP::Relative(4)
 }
 
+fn adjust_relative_base(parameters: Vec<Parameter>, context: &mut Context) -> IP  {
+//    println!("arb {:#?} {:#?}", context, parameters);
+    context.relative_base = (context.relative_base as i64 + context.read(&parameters[0])) as usize;
+    IP::Relative(2)
+}
+
 
 fn halt_implementation(_parameters: Vec<Parameter>, _context: &mut Context) -> IP  {
     IP::Halt
+}
+
+fn init_instruction_definitions() -> HashMap<usize, Instruction> {
+    let instructions = vec!(
+        Instruction { opcode: 1, operand_count: 3, implementation: add_implementation },
+        Instruction { opcode: 2, operand_count: 3, implementation: multiply_implementation },
+        Instruction { opcode: 3, operand_count: 1, implementation: input_implementation },
+        Instruction { opcode: 4, operand_count: 1, implementation: output_implementation },
+        Instruction { opcode: 5, operand_count: 2, implementation: jump_not_zero_implementation },
+        Instruction { opcode: 6, operand_count: 2, implementation: jump_zero_implementation },
+        Instruction { opcode: 7, operand_count: 3, implementation: less_than_implementation },
+        Instruction { opcode: 8, operand_count: 3, implementation: equals_implementation },
+        Instruction { opcode: 9, operand_count: 1, implementation: adjust_relative_base },
+        Instruction { opcode: 99, operand_count: 0, implementation: halt_implementation }
+    );
+    let mut result = HashMap::new();
+    for i in instructions {
+        result.insert(i.opcode, i);
+    }
+    result
 }
 
 fn split_instruction(opcode: usize) -> (usize, Vec<usize>) {
@@ -144,23 +189,23 @@ fn split_instruction(opcode: usize) -> (usize, Vec<usize>) {
     (basic_opcode, modes)
 }
 
-pub fn day2(opcodes: &Vec<isize>) -> isize {
+pub fn day2(opcodes: &Vec<i64>) -> i64 {
     let (input_send, input) = mpsc::channel();
     let (output, output_recieve) = mpsc::channel();
-    let mut context = Context { memory: opcodes.to_vec(), input, output };
+    let mut context = Context { memory: opcodes.to_vec(), input, output, relative_base: 0 };
     thread::spawn(move || {
         run(&mut context);
         context.memory[0]
     }).join().unwrap_or_default()
 }
 
-pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>) -> Vec<isize> {
+pub fn day5(opcodes: &Vec<i64>, inputs: &Vec<i64>) -> Vec<i64> {
     let (input_send, input) = mpsc::channel();
     let (output, output_recieve) = mpsc::channel();
 
     inputs.iter().for_each(|&i| {input_send.send(i);});
 
-    let mut context = Context { memory: opcodes.to_vec(), input, output };
+    let mut context = Context { memory: opcodes.to_vec(), input, output, relative_base: 0 };
     let handle = thread::spawn(move || {
         run(&mut context);
     });
@@ -168,10 +213,10 @@ pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>) -> Vec<isize> {
     output_recieve.iter().collect()
 }
 
-pub fn day7(opcodes: &Vec<isize>, phases: Vec<usize>) -> (Vec<usize>, isize) {
+pub fn day7(opcodes: &Vec<i64>, phases: Vec<usize>) -> (Vec<usize>, i64) {
     recurse(phases)
         .iter()
-        .fold(None, |acc: Option<(Vec<usize>, isize)>, phases| {
+        .fold(None, |acc: Option<(Vec<usize>, i64)>, phases| {
             let result = day7_internal(opcodes, &phases);
             match acc {
                 Some((p, high)) if high >= result => Some((p, high)),
@@ -180,7 +225,7 @@ pub fn day7(opcodes: &Vec<isize>, phases: Vec<usize>) -> (Vec<usize>, isize) {
         }).unwrap()
 }
 
-fn day7_internal(opcodes: &Vec<isize>, phases:&Vec<usize>) -> isize {
+fn day7_internal(opcodes: &Vec<i64>, phases:&Vec<usize>) -> i64 {
     let (sender0, reciever1) = mpsc::channel();
     let (sender1, reciever2) = mpsc::channel();
     let (sender2, reciever3) = mpsc::channel();
@@ -194,11 +239,11 @@ fn day7_internal(opcodes: &Vec<isize>, phases:&Vec<usize>) -> isize {
     let amplifier4 = init_amplifier(opcodes, sender4.clone(), reciever4, &phases[0]);
     let amplifier5 = init_amplifier(opcodes, sender5.clone(), reciever5, &phases[0]);
 
-    sender4.send(phases[4] as isize);
-    sender3.send(phases[3] as isize);
-    sender2.send(phases[2] as isize);
-    sender1.send(phases[1] as isize);
-    sender0.send(phases[0] as isize);
+    sender4.send(phases[4] as i64);
+    sender3.send(phases[3] as i64);
+    sender2.send(phases[2] as i64);
+    sender1.send(phases[1] as i64);
+    sender0.send(phases[0] as i64);
     sender0.send(0);
 
     std::mem::drop(sender1);
@@ -217,8 +262,8 @@ fn day7_internal(opcodes: &Vec<isize>, phases:&Vec<usize>) -> isize {
     result
 }
 
-fn init_amplifier(opcodes: &Vec<isize>, sender: Sender<isize>, reciever :Receiver<isize>, phase: &usize) -> JoinHandle<()> {
-    let mut context = Context { memory: opcodes.to_vec(), input: reciever, output: sender };
+fn init_amplifier(opcodes: &Vec<i64>, sender: Sender<i64>, reciever :Receiver<i64>, phase: &usize) -> JoinHandle<()> {
+    let mut context = Context { memory: opcodes.to_vec(), input: reciever, output: sender, relative_base: 0 };
 //    println!("init amplifier");
     thread::spawn(move || {
         run(&mut context);
@@ -251,7 +296,7 @@ fn run(context: &mut Context) {
 
         match (instruction.implementation)(parameters, context) {
             IP::Relative(offset_change) => {
-                offset = (offset as isize + offset_change) as usize;
+                offset = (offset as i64 + offset_change) as usize;
             }
             IP::Absolute(position) => {
                 offset = position;
@@ -264,30 +309,11 @@ fn run(context: &mut Context) {
   //  println!("{:#?}", context);
 }
 
-fn init_instruction_definitions() -> HashMap<usize, Instruction> {
-    let instructions = vec!(
-        Instruction { opcode: 1, operand_count: 3, implementation: add_implementation },
-        Instruction { opcode: 2, operand_count: 3, implementation: multiply_implementation },
-        Instruction { opcode: 3, operand_count: 1, implementation: input_implementation },
-        Instruction { opcode: 4, operand_count: 1, implementation: output_implementation },
-        Instruction { opcode: 5, operand_count: 2, implementation: jump_not_zero_implementation },
-        Instruction { opcode: 6, operand_count: 2, implementation: jump_zero_implementation },
-        Instruction { opcode: 7, operand_count: 3, implementation: less_than_implementation },
-        Instruction { opcode: 8, operand_count: 3, implementation: equals_implementation },
-        Instruction { opcode: 99, operand_count: 0, implementation: halt_implementation }
-    );
-    let mut result = HashMap::new();
-    for i in instructions {
-        result.insert(i.opcode, i);
-    }
-    result
-}
-
 fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context: &'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
     let opcode = context.memory[offset] as usize;
     let (opcode, modes) = split_instruction(opcode);
     let instruction = &instructions[&opcode];
-    let param_values:Vec<isize> = ((offset + 1)..(offset + 1 + instruction.operand_count)).map(|i| context.memory[i]).collect();
+    let param_values:Vec<i64> = ((offset + 1)..(offset + 1 + instruction.operand_count)).map(|i| context.memory[i]).collect();
 
     let parameters = param_values
         .iter()
@@ -295,13 +321,14 @@ fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context:
         .map(|(i, param)|
             match modes.get(i) {
                 Some(1) => Parameter::Immediate(*param),
+                Some(2) => Parameter::Relative(*param),
                 _ => Parameter::Absolute(*param as usize) }
         ).collect();
     //println!("{:#?} {:#?}", instruction, parameters);
     (instruction, parameters)
 }
 
-pub fn read_program_from_file(path: &str) -> Vec<isize> {
+pub fn read_program_from_file(path: &str) -> Vec<i64> {
     let f = File::open(path).unwrap();
     let file = BufReader::new(&f);
     file.lines().next().unwrap().unwrap().split(",").map(|s| s.parse().unwrap()).collect()
@@ -526,6 +553,33 @@ mod tests {
     fn test_day7_part2_assignment() {
         let memory = read_program_from_file("input7.txt");
         assert_eq!(day7(&memory, (5..10).collect()), (vec!(8, 5, 9, 6, 7), 14260332));
+    }
+
+    #[test]
+    fn test_day9_part1_example1() {
+        assert_eq!(day5(&vec!(109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99), &vec!()), vec!(109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99));
+    }
+
+    #[test]
+    fn test_day9_part1_example2() {
+        assert_eq!(day5(&vec!(1102,34915192,34915192,7,4,7,99,0), &vec!()), vec!(1219070632396864));
+    }
+
+    #[test]
+    fn test_day9_part1_example3() {
+        assert_eq!(day5(&vec!(104,1125899906842624,99), &vec!()), vec!(1125899906842624));
+    }
+
+    #[test]
+    fn test_day9_part1_assignment() {
+        let memory = read_program_from_file("input9.txt");
+        assert_eq!(day5(&memory, &vec!(1)), vec!(3235019597));
+    }
+
+    #[test]
+    fn test_day9_part1_assignment() {
+        let memory = read_program_from_file("input9.txt");
+        assert_eq!(day5(&memory, &vec!(2)), vec!(3235019597));
     }
 
 }
