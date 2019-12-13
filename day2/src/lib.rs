@@ -5,6 +5,7 @@ use std::fs::File;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
+use std::thread::JoinHandle;
 
 struct Instruction {
     opcode: usize,
@@ -54,10 +55,13 @@ impl Context {
     }
 
     fn read_input(&mut self) -> isize {
-        self.input.recv().unwrap()
+        let i = self.input.recv().unwrap();
+//        println!("read {}", i);
+        i
     }
 
     fn write_output(&mut self, value: isize) {
+//        println!("write {}", value);
         self.output.send(value);
     }
 }
@@ -157,11 +161,68 @@ pub fn day5(opcodes: &Vec<isize>, inputs: &Vec<isize>) -> Vec<isize> {
     inputs.iter().for_each(|&i| {input_send.send(i);});
 
     let mut context = Context { memory: opcodes.to_vec(), input, output };
-    thread::spawn(move || {
+    let handle = thread::spawn(move || {
         run(&mut context);
     });
 
     output_recieve.iter().collect()
+}
+
+pub fn day7(opcodes: &Vec<isize>, phases: Vec<usize>) -> (Vec<usize>, isize) {
+    recurse(phases)
+        .iter()
+        .fold(None, |acc: Option<(Vec<usize>, isize)>, phases| {
+            let result = day7_internal(opcodes, &phases);
+            match acc {
+                Some((p, high)) if high >= result => Some((p, high)),
+                _ => Some((phases.clone(), result)),
+            }
+        }).unwrap()
+}
+
+fn day7_internal(opcodes: &Vec<isize>, phases:&Vec<usize>) -> isize {
+    let (sender0, reciever1) = mpsc::channel();
+    let (sender1, reciever2) = mpsc::channel();
+    let (sender2, reciever3) = mpsc::channel();
+    let (sender3, reciever4) = mpsc::channel();
+    let (sender4, reciever5) = mpsc::channel();
+    let (sender5, reciever0) = mpsc::channel();
+
+    let amplifier1 = init_amplifier(opcodes, sender1.clone(), reciever1, &phases[0]);
+    let amplifier2 = init_amplifier(opcodes, sender2.clone(), reciever2, &phases[0]);
+    let amplifier3 = init_amplifier(opcodes, sender3.clone(), reciever3, &phases[0]);
+    let amplifier4 = init_amplifier(opcodes, sender4.clone(), reciever4, &phases[0]);
+    let amplifier5 = init_amplifier(opcodes, sender5.clone(), reciever5, &phases[0]);
+
+    sender4.send(phases[4] as isize);
+    sender3.send(phases[3] as isize);
+    sender2.send(phases[2] as isize);
+    sender1.send(phases[1] as isize);
+    sender0.send(phases[0] as isize);
+    sender0.send(0);
+
+    std::mem::drop(sender1);
+    std::mem::drop(sender2);
+    std::mem::drop(sender3);
+    std::mem::drop(sender4);
+    std::mem::drop(sender5);
+
+    let mut result = 0;
+    reciever0.iter().for_each(|n| {
+//        println!("iter {}", n);
+        result = n;
+        sender0.send(n);
+    });
+
+    result
+}
+
+fn init_amplifier(opcodes: &Vec<isize>, sender: Sender<isize>, reciever :Receiver<isize>, phase: &usize) -> JoinHandle<()> {
+    let mut context = Context { memory: opcodes.to_vec(), input: reciever, output: sender };
+//    println!("init amplifier");
+    thread::spawn(move || {
+        run(&mut context);
+    })
 }
 
 pub fn recurse(input: Vec<usize>) -> Vec<Vec<usize>> {
@@ -179,28 +240,6 @@ pub fn recurse(input: Vec<usize>) -> Vec<Vec<usize>> {
             }).collect()
         }).collect()
     }
-}
-
-pub fn day7(opcodes: &Vec<isize>) -> (Vec<usize>, isize) {
-    recurse((0..5).collect())
-        .iter()
-        .fold(None, |acc: Option<(Vec<usize>, isize)>, phases| {
-            let result = day7_internal(opcodes, &phases);
-            match acc {
-                Some((p, high)) if high >= result => Some((p, high)),
-                _ => Some((phases.clone(), result)),
-            }
-        }).unwrap()
-}
-
-fn day7_internal(opcodes: &Vec<isize>, phases:&Vec<usize>) -> isize {
-    let mut input = 0;
-    for phase in phases {
-        //println!("{}: {}",phase, input);
-        let output = day5(opcodes, &vec!(*phase as isize, input));
-        input = *output.last().unwrap();
-    }
-    input
 }
 
 fn run(context: &mut Context) {
@@ -242,8 +281,6 @@ fn init_instruction_definitions() -> HashMap<usize, Instruction> {
         result.insert(i.opcode, i);
     }
     result
-
-//    instructions.iter().map(|&i| (i.opcode, i)).collect()
 }
 
 fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context: &'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
@@ -447,7 +484,7 @@ mod tests {
     fn test_day7_part1_example2_full() {
         assert_eq!(day7(&vec!(
             3,23,3,24,1002,24,10,24,1002,23,-1,23,
-            101,5,23,23,1,24,23,23,4,23,99,0,0)), (vec!(0,1,2,3,4), 54321));
+            101,5,23,23,1,24,23,23,4,23,99,0,0), (0..5).collect()), (vec!(0, 1, 2, 3, 4), 54321));
     }
 
     #[test]
@@ -461,6 +498,34 @@ mod tests {
     fn test_day7_part1_example3_full() {
         assert_eq!(day7(&vec!(
             3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,
-            1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0)), (vec!(1,0,4,3,2), 65210));
+            1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0), (0..5).collect()), (vec!(1, 0, 4, 3, 2), 65210));
     }
+
+    #[test]
+    fn test_day7_part2_example1_full() {
+        assert_eq!(day7(&vec!(
+            3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,
+            27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5), (5..10).collect()), (vec!(9, 8, 7, 6, 5), 139629729));
+    }
+
+    #[test]
+    fn test_day7_part2_example2_full() {
+        assert_eq!(day7(&vec!(
+            3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,
+            -5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,
+            53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10), (5..10).collect()), (vec!(9, 7, 8, 5, 6), 18216));
+    }
+
+    #[test]
+    fn test_day7_part1_assignment() {
+        let memory = read_program_from_file("input7.txt");
+        assert_eq!(day7(&memory, (0..5).collect()), (vec!(0, 1, 2, 4, 3), 225056));
+    }
+
+    #[test]
+    fn test_day7_part2_assignment() {
+        let memory = read_program_from_file("input7.txt");
+        assert_eq!(day7(&memory, (5..10).collect()), (vec!(8, 5, 9, 6, 7), 14260332));
+    }
+
 }

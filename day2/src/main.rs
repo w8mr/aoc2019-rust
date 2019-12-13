@@ -36,10 +36,11 @@ fn main() {
     println!("Day 5 part 2: {}", outs.join(", "));
 
     let memory = day2::read_program_from_file("input7.txt");
-    let (phases, highest) = day2::day7(&memory);
+    let (phases, highest) = day2::day7(&memory, (0..5).collect());
     println!("Day 7 part 1: phases {:?}, high {}", phases, highest);
 
-
+    let (phases, highest) = day2::day7(&memory, (5..10).collect());
+    println!("Day 7 part 2: phases {:?}, high {}", phases, highest);
 
 }
 
