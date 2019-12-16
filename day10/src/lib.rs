@@ -1,4 +1,6 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap};
+use std::cmp::Ordering::Equal;
+use std::f32::consts::{PI};
 
 #[derive(std::fmt::Debug)]
 struct Grid {
@@ -8,10 +10,10 @@ struct Grid {
 }
 
 #[derive(std::fmt::Debug,std::cmp::PartialEq)]
-struct Asteroid {
+pub struct Asteroid {
     index: usize,
-    x: usize,
-    y: usize,
+    pub x: usize,
+    pub y: usize,
 }
 
 fn gcd(mut a: isize, mut b: isize) -> usize {
@@ -49,14 +51,60 @@ fn distance_angle(a: &Asteroid, b: &Asteroid) -> ((isize, isize), usize){
 
 pub fn part1(input: Vec<&str>) -> ((usize, usize), usize) {
     let grid = read_grid(input);
-    let asteroids:Vec<&Asteroid> = grid.asteroids.iter().collect();
 
-    let mut asteroids_los: Vec<((usize,usize),usize)> = asteroids.iter().map(|asteroid| ((asteroid.x, asteroid.y), count_line_of_sight(&asteroids, asteroid))).collect();
-    asteroids_los.sort_by_key(|e| e.1);
-    let winner = asteroids_los.last().unwrap();
+    let winner = find_most_line_of_sight(&grid.asteroids.iter().collect());
 //    println!("Astroid ({},{}) can see {} Astroids", (winner.0).0, (winner.0).1, winner.1);
 
+    ((winner.0.x, winner.0.y), winner.1)
+}
+
+fn find_most_line_of_sight<'a>(asteroids: &Vec<&'a Asteroid>) -> (&'a Asteroid, usize) {
+    let mut asteroids_los: Vec<(&Asteroid, usize)> = asteroids.iter().map(|asteroid| (*asteroid, count_line_of_sight(&asteroids, asteroid))).collect();
+    asteroids_los.sort_by_key(|e| e.1);
+    let winner = asteroids_los.last().unwrap();
     *winner
+}
+
+pub fn part2(input: Vec<&str>, index: usize) -> (usize, usize) {
+    let grid = read_grid(input);
+
+    let destroy_asteroids:Vec<&Asteroid> = sweep_destroy_asteroids(&grid);
+    (destroy_asteroids[index].x, destroy_asteroids[index].y)
+}
+
+fn sweep_destroy_asteroids(grid: &Grid) -> Vec<&Asteroid>{
+    let asteroids = &grid.asteroids.iter().collect();
+    let winner = find_most_line_of_sight(asteroids);
+
+    let angles_map = partition_by_angle(asteroids, &winner.0);
+    let angles = find_angles(&angles_map);
+    let mut index = 0;
+    let mut destroyed: Vec<&Asteroid> = Vec::new();
+    while destroyed.len() < asteroids.len() - 1 {
+        println!("Sweep {}", index + 1);
+        for a in angles.clone() {
+            let found_asteroid = angles_map.get(&a).unwrap().get(index);
+            match found_asteroid {
+                Some(&(_, asteroid)) => {
+                    println!("Angle {} {} {:#?}", a.0, a.1, asteroid);
+                    destroyed.push(&asteroid);
+                },
+                _ => {}
+            }
+        }
+        index += 1;
+    }
+    destroyed
+}
+
+fn find_angles(angles_map: &HashMap<(isize, isize), Vec<(usize, & Asteroid)>>) -> Vec<(isize, isize)>{
+    let mut angles: Vec<(isize, isize)> = angles_map.keys().map(|&k| k).collect();
+    angles.sort_by(|(ady, adx), (bdy, bdx)| angle(ady, adx).partial_cmp(&angle(bdy, bdx)).unwrap_or(Equal));
+    angles
+}
+
+fn angle(dy: &isize , dx: &isize) -> f32 {
+    ((*dy as f32).atan2(*dx as f32) + 2.5 * PI) % (2f32 * PI)
 }
 
 fn count_line_of_sight(asteroids: &Vec<&Asteroid>, asteroid_from: &&Asteroid) -> usize {
@@ -207,4 +255,36 @@ mod tests {
         assert_eq!(y, 29);
         assert_eq!(c, 299);
     }
+
+    #[test]
+    fn test_sweep_destroy_example5() {
+        let grid = read_grid(vec!(".#..##.###...#######", "##.############..##.", ".#.######.########.#", ".###.#######.####.#.", "#####.##.#.##.###.##", "..#####..#.#########", "####################", "#.####....###.#.#.##", "##.#################", "#####.##.###..####..", "..######..##.#######", "####.##.####...##..#", ".#####..#.######.###", "##...#.##########...", "#.##########.#######", ".####.#.###.###.#.##", "....##.##.###..#####", ".#.#.###########.###", "#.#.#.#####.####.###", "###.##.####.##.#..##"));
+        let destroyed_asteroids = sweep_destroy_asteroids(&grid);
+        assert_eq!(destroyed_asteroids[0].x, 11);
+        assert_eq!(destroyed_asteroids[0].y, 12);
+        assert_eq!(destroyed_asteroids[199].x, 8);
+        assert_eq!(destroyed_asteroids[199].y, 2);
+        assert_eq!(destroyed_asteroids[298].x, 11);
+        assert_eq!(destroyed_asteroids[298].y, 1);
+    }
+
+    #[test]
+    fn test_day10_part2_example_1() {
+        let asteroid = part2(vec!(".#..#", ".....", "#####", "....#", "...##"), 5);
+        assert_eq!(asteroid.0, 0);
+        assert_eq!(asteroid.1, 2);
+    }
+
+    #[test]
+    fn test_day10_part2_assignment() {
+        let f = File::open("input10.txt").unwrap();
+        let file = BufReader::new(&f);
+        let raw_lines: Vec<Result<String, Error>> = file.lines().collect();
+        let grid_lines: Vec<&str> = raw_lines.iter().map(|l| l.as_ref().unwrap()).map(|s|s.as_str()).collect();
+        let asteroid = part2(grid_lines, 199);
+        assert_eq!(asteroid.0, 14);
+        assert_eq!(asteroid.1, 19);
+    }
+
+
 }
