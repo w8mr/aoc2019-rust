@@ -50,5 +50,16 @@ fn main() {
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 9 part 2: {}", outs.join(", "));
 
+    let memory = day2::read_program_from_file("input11.txt");
+    println!("Day 11 part 1: {}", day2::day11_part1(&memory, day2::Color::Black));
+
+    println!("Day 11 part 2: ");
+    let lines = day2::day11_part2(&memory, day2::Color::White);
+    for line in lines {
+        let str:String = line.into_iter().collect();
+        println!("{}", str);
+    }
+
+
 }
 
