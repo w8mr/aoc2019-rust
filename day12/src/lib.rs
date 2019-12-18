@@ -23,10 +23,14 @@ fn compare_position(pos1: i32, pos2: i32) -> i32 {
 
 pub fn day12_part1(positions: Vec<Vec<i32>>, steps: u32) -> i32 {
     let mut moons:Vec<Moon> = positions.iter().map(|positions| Moon::new((*positions).clone())).collect();
-    for step in 0..steps {
-        println!("Step {}", step + 1);
-        update_velocities(&mut moons);
-        update_positions(&mut moons)
+    for dimension in 0..3 {
+        println!("Dimension {}", dimension);
+        for step in 0..steps {
+            println!("Step {}", step + 1);
+            update_velocities(&mut moons, dimension);
+            update_positions(&mut moons, dimension)
+        }
+
     }
     let total_energy = sum_energy(&mut moons);
     println!("Total energy {}", total_energy);
@@ -50,32 +54,28 @@ fn kinetic_energy(moon: &&Moon) -> i32 {
 }
 
 
-fn update_positions(moons: &mut Vec<Moon>) -> () {
+fn update_positions(moons: &mut Vec<Moon>, dimension:usize) -> () {
     for moon in moons {
-        update_position(moon);
+        update_position(moon, dimension);
         println!("Moon ({},{},{}) ({},{},{})", moon.position[0], moon.position[1], moon.position[2], moon.velocity[0], moon.velocity[1], moon.velocity[2]);
     }
 }
 
-fn update_velocities(mut moons: &mut Vec<Moon>) {
+fn update_velocities(mut moons: &mut Vec<Moon>, dimension:usize) {
     for (index1, index2) in index_pairs(4) {
-        update_velocity(&mut moons, index1, index2);
+        update_velocity(&mut moons, index1, index2, dimension);
 //        println!("Moon pair ({},{},{}) ({},{},{})", moons[index1].position[0], moons[index1].position[1], moons[index1].position[2], moons[index2].position[0], moons[index2].position[1], moons[index2].position[2]);
     }
 }
 
-fn update_velocity(moons: &mut Vec<Moon>, index1: usize, index2: usize) {
-    for dimension in 0..3 {
-        let velocity_change = compare_position(moons[index1].position[dimension], moons[index2].position[dimension]);
-        moons[index1].velocity[dimension] -= velocity_change;
-        moons[index2].velocity[dimension] += velocity_change;
-    }
+fn update_velocity(moons: &mut Vec<Moon>, index1: usize, index2: usize, dimension:usize) {
+    let velocity_change = compare_position(moons[index1].position[dimension], moons[index2].position[dimension]);
+    moons[index1].velocity[dimension] -= velocity_change;
+    moons[index2].velocity[dimension] += velocity_change;
 }
 
-fn update_position(moon: &mut Moon) {
-    for dimension in 0..3 {
-        moon.position[dimension] += moon.velocity[dimension];
-    }
+fn update_position(moon: &mut Moon, dimension:usize) {
+    moon.position[dimension] += moon.velocity[dimension];
 }
 
 fn index_pairs(index: usize) -> Vec<(usize, usize)> {
