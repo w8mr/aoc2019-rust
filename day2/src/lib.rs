@@ -2,10 +2,13 @@ use std::collections::HashMap;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
-use std::sync::mpsc;
+use std::sync::{mpsc};
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
+
+use termion::{clear,cursor};
+use std::time::Duration;
 
 struct Instruction {
     opcode: usize,
@@ -395,6 +398,88 @@ pub fn recurse(input: Vec<usize>) -> Vec<Vec<usize>> {
     }
 }
 
+pub fn day13_part1(opcodes: &mut Vec<i64>, display: bool, delay: u64) -> usize {
+    day13(opcodes, display, delay).0
+}
+
+pub fn day13_part2(opcodes: &mut Vec<i64>, display: bool, delay: u64) -> i64 {
+    (*opcodes)[0] = 2;
+    day13(opcodes, display, delay).1
+}
+
+pub fn day13(opcodes: &mut Vec<i64>, display: bool, delay: u64) -> (usize, i64){
+    let (input_send, input) = mpsc::channel();
+    let (output, output_recieve) = mpsc::channel();
+
+    day13_intcode_computer(opcodes, input, output);
+    day13_game_loop(input_send, output_recieve, display, delay)
+}
+
+fn day13_game_loop(input_send: Sender<i64>, output_recieve: Receiver<i64>, display: bool, delay: u64) -> (usize, i64) {
+    let mut score = 0;
+    let mut block_count = 0;
+    let mut paddle_position = 0;
+    let mut ball_position = 0;
+    let mut iteration = 0;
+
+    if display { print!("{}", clear::All); }
+    loop {
+        let xpos = output_recieve.recv();
+        if xpos.is_err() {
+            break;
+        }
+        let xpos = xpos.unwrap();
+        let ypos = output_recieve.recv().unwrap();
+        let action = output_recieve.recv().unwrap();
+
+        if display { print!("{}", cursor::Goto((xpos + 1) as u16, (ypos + 1) as u16)); }
+        match action {
+            0 => {
+                if display { println!(" "); }
+            },
+            1 => {
+                if display { println!("#"); }
+            },
+            2 => {
+                block_count += 1;
+                if display { println!("*"); }
+            },
+            3 => {
+                paddle_position = xpos;
+                if display { println!("="); }
+            },
+            4 => {
+                ball_position = xpos;
+                let new_direction = new_movement(paddle_position, ball_position);
+                input_send.send(new_direction);
+                if display { println!("o"); }
+                iteration +=1;
+                if display { println!("{}Update movement ball ({} {}) paddle {} new direction {} score {}      ", cursor::Goto(1,iteration % 10 + 25 ), ball_position, ypos, paddle_position, new_direction, score); }
+                if display { thread::sleep(Duration::from_millis(delay)); }
+            },
+            new_score => {
+                score = new_score;
+            }
+        }
+    }
+    if display { print!("{}", cursor::Goto(1, 35)); }
+
+    (block_count, score)
+}
+
+fn new_movement(paddle_position: i64, ball_position: i64) -> i64 {
+    if ball_position  > paddle_position { 1 }
+    else if ball_position  < paddle_position { -1 }
+    else { 0 }
+}
+
+fn day13_intcode_computer(opcodes: &mut Vec<i64>, input: Receiver<i64>, output: Sender<i64>) {
+    let mut context = Context { memory: opcodes.to_vec(), input, output, relative_base: 0 };
+    thread::spawn(move || {
+        run(&mut context);
+    });
+}
+
 fn run(context: &mut Context) {
     let instructions = init_instruction_definitions();
     let mut offset: usize = 0;
@@ -688,6 +773,18 @@ mod tests {
     fn test_day9_part2_assignment() {
         let memory = read_program_from_file("input9.txt");
         assert_eq!(day5(&memory, &vec!(2)), vec!(80274));
+    }
+
+    #[test]
+    fn test_day13_part1_assignment() {
+        let mut memory = read_program_from_file("input13.txt");
+        assert_eq!(day13_part1(&mut memory, false, 0), 355);
+    }
+
+    #[test]
+    fn test_day13_part2_assignment() {
+        let mut memory = read_program_from_file("input13.txt");
+        assert_eq!(day13_part2(&mut memory, false, 0), 18371);
     }
 
 }

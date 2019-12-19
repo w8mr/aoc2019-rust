@@ -61,5 +61,8 @@ fn main() {
     }
 
 
+    let mut memory = day2::read_program_from_file("input13.txt");
+    println!("Day 13 part 1: {}", day2::day13_part1(&mut memory, true, 5));
+    println!("Day 13 part 2: {}", day2::day13_part2(&mut memory, true, 5));
 }
 
