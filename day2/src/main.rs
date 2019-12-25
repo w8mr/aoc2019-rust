@@ -1,5 +1,5 @@
 fn main() {
-    let mut memory = day2::read_program_from_file("input2.txt");
+    let mut memory = intcode::read_program_from_file("input2.txt");
     memory[1]=12;
     memory[2]=02;
     println!("Day 2 part 1: {}",day2::day2(&memory));
@@ -24,7 +24,7 @@ fn main() {
     memory[2]=35;
     println!("Day 2 part 2: {}",day2::day2(&memory));
 
-    let memory = day2::read_program_from_file("input5.txt");
+    let memory = intcode::read_program_from_file("input5.txt");
 
     let outputs = day2::day5(&memory, &vec!(1));
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
@@ -34,14 +34,14 @@ fn main() {
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 5 part 2: {}", outs.join(", "));
 
-    let memory = day2::read_program_from_file("input7.txt");
+    let memory = intcode::read_program_from_file("input7.txt");
     let (phases, highest) = day2::day7(&memory, (0..5).collect());
     println!("Day 7 part 1: phases {:?}, high {}", phases, highest);
 
     let (phases, highest) = day2::day7(&memory, (5..10).collect());
     println!("Day 7 part 2: phases {:?}, high {}", phases, highest);
 
-    let memory = day2::read_program_from_file("input9.txt");
+    let memory = intcode::read_program_from_file("input9.txt");
     let outputs = day2::day5(&memory, &vec!(1));
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 9 part 1: {}", outs.join(", "));
@@ -50,7 +50,7 @@ fn main() {
     let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
     println!("Day 9 part 2: {}", outs.join(", "));
 
-    let memory = day2::read_program_from_file("input11.txt");
+    let memory = intcode::read_program_from_file("input11.txt");
     println!("Day 11 part 1: {}", day2::day11_part1(&memory, day2::Color::Black));
 
     println!("Day 11 part 2: ");
@@ -61,7 +61,7 @@ fn main() {
     }
 
 
-    let mut memory = day2::read_program_from_file("input13.txt");
+    let mut memory = intcode::read_program_from_file("input13.txt");
     println!("Day 13 part 1: {}", day2::day13_part1(&mut memory, true, 5));
     println!("Day 13 part 2: {}", day2::day13_part2(&mut memory, true, 5));
 }
