@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::cmp::Ordering::{Greater, Less};
-use std::cmp::Ordering;
+use std::cmp::{Ordering, min};
 
 #[derive(std::fmt::Debug)]
 struct Reaction {
@@ -21,12 +21,12 @@ impl Reaction {
 
 #[derive(std::fmt::Debug)]
 struct ReactionPart {
-    count:u32,
+    count:u64,
     element:String
 }
 
 impl ReactionPart {
-    fn new(count: u32, element: &str) -> ReactionPart {
+    fn new(count: u64, element: &str) -> ReactionPart {
         ReactionPart { count, element: element.to_string() }
     }
 }
@@ -54,7 +54,7 @@ fn parse_reactions(rections: &Vec<&str>) -> HashMap<String, Reaction> {
     rections.iter().map(|reaction| parse_reaction(reaction)).map(|reaction|(reaction.output[0].element.clone(), reaction)).collect()
 }
 
-fn count(reactions: &HashMap<String, Reaction>, needed: &str, needed_for: &str, needed_count: u32, excess: &mut HashMap<String, u32>) -> u32 {
+fn count(reactions: &HashMap<String, Reaction>, needed: &str, needed_for: &str, needed_count: u64, excess: &mut HashMap<String, u64>) -> u64 {
     println!("needed_for: {}, needed_count: {}", needed_for, needed_count);
     let reaction = reactions.get(&needed_for.to_string()).unwrap();
     reaction.input.iter().map(|reaction_part| {
@@ -83,7 +83,7 @@ fn count(reactions: &HashMap<String, Reaction>, needed: &str, needed_for: &str, 
     }).sum()
 }
 
-fn div_round_up_overflow(a: u32, b: u32) -> (u32, u32) {
+fn div_round_up_overflow(a: u64, b: u64) -> (u64, u64) {
     let m = a % b;
     if m == 0 {
         (a / b, 0)
@@ -115,23 +115,41 @@ fn can_produce(possible_reactions: &mut Vec<(Reaction, Reaction)>, reactions: &m
 
 }
 
-pub fn part1_try3(reactions: Vec<&str>) -> u32 {
+pub fn part2(reactions: &Vec<&str>) -> u64 {
+    let existing_elements = 1000000000000u64;
+    let mut guess= 1;
+    let mut previous = 3;
+    let mut iteration = 0;
+    while (guess as i64-previous as i64).abs() > 1 && iteration < 50 {
+        let mut answer = method3(reactions,"ORE", "FUEL", guess);
+        previous = guess;
+        guess = (existing_elements as u128 * guess as u128 / answer as u128) as u64;
+        println!("Guess {}, previous {}, answer {}", guess, previous, answer);
+        iteration += 1;
+    }
+    min(guess, previous)
+}
+
+
+pub fn part1_try3(reactions: &Vec<&str>) -> u64 {
+    method3(reactions, "ORE", "FUEL", 1)
+}
+
+fn method3(reactions: &Vec<&str>, existing: &str, needed: &str, count_needed: u64) -> u64 {
     let mut reactions = parse_reactions(&reactions);
     let mut vec: Vec<&Reaction> = reactions.values().collect();
-    let sorted_reactions = order_by_possible_reactions(&mut vec, "ORE");
-
-    println!("try3 {:#?}", sorted_reactions);
-
-    let mut count: HashMap<&str, u32> = HashMap::new();
-    count.insert("FUEL", 1);
+    let sorted_reactions = order_by_possible_reactions(&mut vec, existing);
+//    println!("try3 {:#?}", sorted_reactions);
+    let mut count: HashMap<&str, u64> = HashMap::new();
+    count.insert(needed, count_needed);
     sorted_reactions.iter().for_each(|reaction| {
-        let reaction_count = div_round_up_overflow(count.get(reaction.output[0].element.as_str()).unwrap_or(&0u32).clone(), reaction.output[0].count).0;
+        let reaction_count = div_round_up_overflow(count.get(reaction.output[0].element.as_str()).unwrap_or(&0u64).clone(), reaction.output[0].count).0;
         reaction.input.iter().for_each(|rp| {
             *count.entry(rp.element.as_str()).or_insert(0) += reaction_count * rp.count;
         });
-        println!("Reaction {} count {:#?}", reaction.output[0].element, count);
+//        println!("Reaction {} count {:#?}", reaction.output[0].element, count);
     });
-    count.get("ORE").unwrap_or(&0u32).clone()
+    count.get(existing).unwrap_or(&0u64).clone()
 }
 
 fn order_by_possible_reactions<'a>(vec: &mut Vec<&'a Reaction>, possible_element: &str) -> Vec<&'a Reaction> {
@@ -154,8 +172,8 @@ fn order_by_possible_reactions<'a>(vec: &mut Vec<&'a Reaction>, possible_element
     sorted_reactions
 }
 
-pub fn part1_try2(reactions: Vec<&str>) -> u32 {
-    let mut reactions = parse_reactions(&reactions);
+pub fn part1_try2(reactions: &Vec<&str>) -> u64 {
+    let mut reactions = parse_reactions(reactions);
 
     let mut posible_reactions = vec!((Reaction::new(
         vec!(ReactionPart::new(1, "ORE")),
@@ -168,8 +186,8 @@ pub fn part1_try2(reactions: Vec<&str>) -> u32 {
     0
 }
 
-pub fn part1(reactions: Vec<&str>) -> u32 {
-    let reactions = parse_reactions(&reactions);
+pub fn part1(reactions: &Vec<&str>) -> u64 {
+    let reactions = parse_reactions(reactions);
     //println!("{:#?}", reactions) ;
     count(&reactions, "ORE", "FUEL", 1, &mut HashMap::new())
 }
@@ -180,58 +198,72 @@ mod tests {
 
     #[test]
     fn part1_try3_example1() {
-        assert_eq!(part1_try3(example1()), 31);
+        assert_eq!(part1_try3(&example1()), 31);
     }
 
     #[test]
     fn part1_try3_example2() {
-        assert_eq!(part1_try3(example2()), 165);
+        assert_eq!(part1_try3(&example2()), 165);
     }
 
     #[test]
     fn part1_try3_example3() {
-        assert_eq!(part1_try3(example3()), 13312);
+        assert_eq!(part1_try3(&example3()), 13312);
     }
 
     #[test]
     fn part1_try3_example4() {
-        assert_eq!(part1_try3(example4()), 180697);
+        assert_eq!(part1_try3(&example4()), 180697);
     }
 
     #[test]
     fn part1_try3_example5() {
-        assert_eq!(part1_try3(example5()), 2210736);
+        assert_eq!(part1_try3(&example5()), 2210736);
     }
 
+    #[test]
+    fn part2_example3() {
+        assert_eq!(part2(&example3()), 82892753);
+    }
+
+    #[test]
+    fn part2_example4() {
+        assert_eq!(part2(&example4()), 5586022);
+    }
+
+    #[test]
+    fn part2_example5() {
+        assert_eq!(part2(&example5()), 460664);
+    }
 
     #[test]
     fn part1_try2_example1() {
-        assert_eq!(part1_try2(example1()), 31);
+        assert_eq!(part1_try2(&example1()), 31);
     }
 
     #[test]
     fn part1_example1() {
-        assert_eq!(part1(example1()), 31);
+        assert_eq!(part1(&example1()), 31);
     }
 
     #[test]
     fn part1_example2() {
-        assert_eq!(part1(example2()), 165);
+        assert_eq!(part1(&example2()), 165);
     }
 
     #[test]
     fn part1_example3() {
-        assert_eq!(part1(example3()), 13312);
+        assert_eq!(part1(&example3()), 13312);
     }
 
 //    #[test]
     fn part1_example4() {
-        assert_eq!(part1(example4()), 180697);
+        assert_eq!(part1(&example4()), 180697);
     }
 
 //    #[test]
     fn part1_example5() {
-        assert_eq!(part1(example5()), 2210736);
+        assert_eq!(part1(&example5()), 2210736);
     }
 
 
@@ -248,7 +280,7 @@ mod tests {
     #[test]
     fn count_non_recursive_without_excess() {
         let reactions = parse_reactions(&example2());
-        let mut excess:HashMap<String, u32> = HashMap::new();
+        let mut excess:HashMap<String, u64> = HashMap::new();
         assert_eq!(count(&reactions, "ORE", "A", 2, &mut excess), 9);
         assert_eq!(*excess.get("A").unwrap_or(&0),0);
     }
@@ -257,14 +289,14 @@ mod tests {
     #[test]
     fn count_non_recursive_with_excess() {
         let reactions = parse_reactions(&example2());
-        let mut excess:HashMap<String, u32> = HashMap::new();
+        let mut excess:HashMap<String, u64> = HashMap::new();
         assert_eq!(count(&reactions, "ORE", "A", 1, &mut excess), 9);
         assert_eq!(*excess.get("A").unwrap_or(&0),1);
     }
     #[test]
     fn count_recursive_with_excess() {
         let reactions = parse_reactions(&example2());
-        let mut excess:HashMap<String, u32> = HashMap::new();
+        let mut excess:HashMap<String, u64> = HashMap::new();
         assert_eq!(count(&reactions, "ORE", "AB", 1, &mut excess), 34);
         assert_eq!(*excess.get("A").unwrap_or(&0),1);
         assert_eq!(*excess.get("B").unwrap_or(&0),2);

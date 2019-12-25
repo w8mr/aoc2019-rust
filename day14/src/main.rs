@@ -7,5 +7,6 @@ fn main() {
     let file = BufReader::new(&f);
     let reactions: Vec<String> = file.lines().map(|l| l.unwrap()).collect();
     let reactions= reactions.iter().map(|r| r.as_str()).collect();
-    println!("Day14 part1 {}", day14::part1_try3(reactions))
+    println!("Day14 part1 {}", day14::part1_try3(&reactions));
+    println!("Day14 part2 {}", day14::part2(&reactions));
 }
