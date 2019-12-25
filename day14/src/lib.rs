@@ -31,11 +31,6 @@ impl ReactionPart {
     }
 }
 
-/*#[derive(std::fmt::Debug, std::hash::Hash, std::cmp::Eq)]
-struct Element {
-    name: String
-}
-*/
 fn parse_reaction_part(reaction_part: &str) -> ReactionPart {
     let mut parts = reaction_part.split(" ");
     let count = parts.next().unwrap().parse().unwrap();
@@ -54,35 +49,6 @@ fn parse_reactions(rections: &Vec<&str>) -> HashMap<String, Reaction> {
     rections.iter().map(|reaction| parse_reaction(reaction)).map(|reaction|(reaction.output[0].element.clone(), reaction)).collect()
 }
 
-fn count(reactions: &HashMap<String, Reaction>, needed: &str, needed_for: &str, needed_count: u64, excess: &mut HashMap<String, u64>) -> u64 {
-    println!("needed_for: {}, needed_count: {}", needed_for, needed_count);
-    let reaction = reactions.get(&needed_for.to_string()).unwrap();
-    reaction.input.iter().map(|reaction_part| {
-        let (reaction_count, overflow) = div_round_up_overflow(needed_count, reaction.output[0].count);
-        println!("reaction_part.element: {}, reaction_part.count: {}, reaction_count {}, overflow {}", reaction_part.element, reaction_part.count, reaction_count, overflow);
-        if reaction_part.element == needed.to_string() {
-            if overflow > 0 {
-                let cuurent_excess = excess.remove(needed_for).unwrap_or(0);
-
-                excess.insert(needed_for.to_string(), overflow+ cuurent_excess);
-                println!("needed {}, current_excess {}, overflow {}", needed, cuurent_excess, overflow);
-            }
-            reaction_part.count * reaction_count
-        } else {
-            let excess_for_input = excess.remove(reaction_part.element.as_str()).unwrap_or(0);
-            let needed_for_input = reaction_part.count * reaction_count;
-            if needed_for_input >= excess_for_input {
-                println!("reaction: excess_for_input {}, needed_for_input {}",excess_for_input, needed_for_input);
-                count(reactions, needed, reaction_part.element.as_str(), needed_for_input-excess_for_input, excess)
-            } else {
-                println!("excess: excess_for_input {}, needed_for_input {}",excess_for_input, needed_for_input);
-                excess.insert(reaction_part.element.clone(), excess_for_input - needed_for_input);
-                0
-            }
-        }
-    }).sum()
-}
-
 fn div_round_up_overflow(a: u64, b: u64) -> (u64, u64) {
     let m = a % b;
     if m == 0 {
@@ -92,50 +58,25 @@ fn div_round_up_overflow(a: u64, b: u64) -> (u64, u64) {
     }
 }
 
-fn check_needed_inputs(possible_reactions: &HashMap<String, &Reaction>, reaction: &Reaction) -> Option<Reaction> {
-    println!("reaction: {:#?}", reaction);
-    let x:Vec<Option<(ReactionPart, ReactionPart)>> = reaction.input.iter().map(|rp| match possible_reactions.get(&rp.element) {
-        Some(reaction_inner) => {
-            let c = div_round_up_overflow(rp.count, reaction_inner.output[0].count);
-            Some((
-                ReactionPart::new(c.0*reaction_inner.output[0].count, reaction_inner.output[0].element.as_str()),
-                ReactionPart::new(1, reaction.output[0].element.as_str())))
-        },
-        None => None
-    }).collect();
-    println!("check_needed_inputs {:#?}", x);
-    None
-}
-
-fn can_produce(possible_reactions: &mut Vec<(Reaction, Reaction)>, reactions: &mut HashMap<String, Reaction>) {
-    let possible_elements: HashMap<String, &Reaction> = possible_reactions.iter().map(|r| (r.0.output[0].element.clone(), &r.1)).collect();
-    println!("possible_elements: {:#?}", possible_elements);
-    let x:Vec<Option<Reaction>> = reactions.values().map(|r| check_needed_inputs(&possible_elements, r)).collect();
-    println!("{:#?}", x);
-
-}
-
 pub fn part2(reactions: &Vec<&str>) -> u64 {
     let existing_elements = 1000000000000u64;
     let mut guess= 1;
     let mut previous = 3;
-    let mut iteration = 0;
-    while (guess as i64-previous as i64).abs() > 1 && iteration < 50 {
-        let mut answer = method3(reactions,"ORE", "FUEL", guess);
+    while (guess as i64-previous as i64).abs() > 1 {
+        let mut answer = calculate(reactions, "ORE", "FUEL", guess);
         previous = guess;
         guess = (existing_elements as u128 * guess as u128 / answer as u128) as u64;
-        println!("Guess {}, previous {}, answer {}", guess, previous, answer);
-        iteration += 1;
+       // println!("Guess {}, previous {}, answer {}", guess, previous, answer);
     }
     min(guess, previous)
 }
 
 
-pub fn part1_try3(reactions: &Vec<&str>) -> u64 {
-    method3(reactions, "ORE", "FUEL", 1)
+pub fn part1(reactions: &Vec<&str>) -> u64 {
+    calculate(reactions, "ORE", "FUEL", 1)
 }
 
-fn method3(reactions: &Vec<&str>, existing: &str, needed: &str, count_needed: u64) -> u64 {
+fn calculate(reactions: &Vec<&str>, existing: &str, needed: &str, count_needed: u64) -> u64 {
     let mut reactions = parse_reactions(&reactions);
     let mut vec: Vec<&Reaction> = reactions.values().collect();
     let sorted_reactions = order_by_possible_reactions(&mut vec, existing);
@@ -172,53 +113,33 @@ fn order_by_possible_reactions<'a>(vec: &mut Vec<&'a Reaction>, possible_element
     sorted_reactions
 }
 
-pub fn part1_try2(reactions: &Vec<&str>) -> u64 {
-    let mut reactions = parse_reactions(reactions);
-
-    let mut posible_reactions = vec!((Reaction::new(
-        vec!(ReactionPart::new(1, "ORE")),
-        vec!(ReactionPart::new(1, "ORE"))
-    ), Reaction::new(
-        vec!(ReactionPart::new(1, "ORE")),
-        vec!(ReactionPart::new(1, "ORE"))
-    )));
-    can_produce(&mut posible_reactions, &mut reactions);
-    0
-}
-
-pub fn part1(reactions: &Vec<&str>) -> u64 {
-    let reactions = parse_reactions(reactions);
-    //println!("{:#?}", reactions) ;
-    count(&reactions, "ORE", "FUEL", 1, &mut HashMap::new())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn part1_try3_example1() {
-        assert_eq!(part1_try3(&example1()), 31);
+        assert_eq!(part1(&example1()), 31);
     }
 
     #[test]
     fn part1_try3_example2() {
-        assert_eq!(part1_try3(&example2()), 165);
+        assert_eq!(part1(&example2()), 165);
     }
 
     #[test]
     fn part1_try3_example3() {
-        assert_eq!(part1_try3(&example3()), 13312);
+        assert_eq!(part1(&example3()), 13312);
     }
 
     #[test]
     fn part1_try3_example4() {
-        assert_eq!(part1_try3(&example4()), 180697);
+        assert_eq!(part1(&example4()), 180697);
     }
 
     #[test]
     fn part1_try3_example5() {
-        assert_eq!(part1_try3(&example5()), 2210736);
+        assert_eq!(part1(&example5()), 2210736);
     }
 
     #[test]
@@ -237,37 +158,6 @@ mod tests {
     }
 
     #[test]
-    fn part1_try2_example1() {
-        assert_eq!(part1_try2(&example1()), 31);
-    }
-
-    #[test]
-    fn part1_example1() {
-        assert_eq!(part1(&example1()), 31);
-    }
-
-    #[test]
-    fn part1_example2() {
-        assert_eq!(part1(&example2()), 165);
-    }
-
-    #[test]
-    fn part1_example3() {
-        assert_eq!(part1(&example3()), 13312);
-    }
-
-//    #[test]
-    fn part1_example4() {
-        assert_eq!(part1(&example4()), 180697);
-    }
-
-//    #[test]
-    fn part1_example5() {
-        assert_eq!(part1(&example5()), 2210736);
-    }
-
-
-    #[test]
     fn div_round_up_overflow_overflow() {
         assert_eq!(div_round_up_overflow(100,80), (2,60));
     }
@@ -275,32 +165,6 @@ mod tests {
     #[test]
     fn div_round_up_overflow_no_overflow() {
         assert_eq!(div_round_up_overflow(160,80), (2,0));
-    }
-
-    #[test]
-    fn count_non_recursive_without_excess() {
-        let reactions = parse_reactions(&example2());
-        let mut excess:HashMap<String, u64> = HashMap::new();
-        assert_eq!(count(&reactions, "ORE", "A", 2, &mut excess), 9);
-        assert_eq!(*excess.get("A").unwrap_or(&0),0);
-    }
-
-
-    #[test]
-    fn count_non_recursive_with_excess() {
-        let reactions = parse_reactions(&example2());
-        let mut excess:HashMap<String, u64> = HashMap::new();
-        assert_eq!(count(&reactions, "ORE", "A", 1, &mut excess), 9);
-        assert_eq!(*excess.get("A").unwrap_or(&0),1);
-    }
-    #[test]
-    fn count_recursive_with_excess() {
-        let reactions = parse_reactions(&example2());
-        let mut excess:HashMap<String, u64> = HashMap::new();
-        assert_eq!(count(&reactions, "ORE", "AB", 1, &mut excess), 34);
-        assert_eq!(*excess.get("A").unwrap_or(&0),1);
-        assert_eq!(*excess.get("B").unwrap_or(&0),2);
-        assert_eq!(*excess.get("ORE").unwrap_or(&0),0);
     }
 
     fn example1() -> Vec<&'static str> {
