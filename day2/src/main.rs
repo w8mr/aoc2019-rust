@@ -23,46 +23,5 @@ fn main() {
     memory[1]=66;
     memory[2]=35;
     println!("Day 2 part 2: {}",day2::day2(&memory));
-
-    let memory = intcode::read_program_from_file("input5.txt");
-
-    let outputs = day2::day5(&memory, &vec!(1));
-    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
-    println!("Day 5 part 1: {}", outs.join(", "));
-
-    let outputs = day2::day5(&memory, &vec!(5));
-    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
-    println!("Day 5 part 2: {}", outs.join(", "));
-
-    let memory = intcode::read_program_from_file("input7.txt");
-    let (phases, highest) = day2::day7(&memory, (0..5).collect());
-    println!("Day 7 part 1: phases {:?}, high {}", phases, highest);
-
-    let (phases, highest) = day2::day7(&memory, (5..10).collect());
-    println!("Day 7 part 2: phases {:?}, high {}", phases, highest);
-
-    let memory = intcode::read_program_from_file("input9.txt");
-    let outputs = day2::day5(&memory, &vec!(1));
-    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
-    println!("Day 9 part 1: {}", outs.join(", "));
-
-    let outputs = day2::day5(&memory, &vec!(2));
-    let outs:Vec<String> = outputs.iter().map(|n| n.to_string()).collect();
-    println!("Day 9 part 2: {}", outs.join(", "));
-
-    let memory = intcode::read_program_from_file("input11.txt");
-    println!("Day 11 part 1: {}", day2::day11_part1(&memory, day2::Color::Black));
-
-    println!("Day 11 part 2: ");
-    let lines = day2::day11_part2(&memory, day2::Color::White);
-    for line in lines {
-        let str:String = line.into_iter().collect();
-        println!("{}", str);
-    }
-
-
-    let mut memory = intcode::read_program_from_file("input13.txt");
-    println!("Day 13 part 1: {}", day2::day13_part1(&mut memory, true, 5));
-    println!("Day 13 part 2: {}", day2::day13_part2(&mut memory, true, 5));
 }
 
