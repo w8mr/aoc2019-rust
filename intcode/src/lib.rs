@@ -3,6 +3,8 @@ use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
 use std::sync::mpsc::{Receiver, Sender};
+use std::thread;
+use std::sync::mpsc;
 
 
 struct Instruction {
@@ -225,6 +227,21 @@ pub fn run(context: &mut Context) {
     }
   //  println!("{:#?}", context);
 }
+
+pub fn run_input_output(opcodes: &Vec<i64>, inputs: &Vec<i64>) -> Vec<i64> {
+    let (input_send, input) = mpsc::channel();
+    let (output, output_recieve) = mpsc::channel();
+
+    inputs.iter().for_each(|&i| {input_send.send(i).unwrap();});
+
+    let mut context = Context::new(opcodes.to_vec(), input, output);
+    thread::spawn(move || {
+        run(&mut context);
+    });
+
+    output_recieve.iter().collect()
+}
+
 
 fn parse_instruction<'a>(instructions: &'a HashMap<usize, Instruction>, context: &'a mut Context, offset: usize) -> (&'a Instruction, Vec<Parameter>) {
     let opcode = context.memory[offset] as usize;
